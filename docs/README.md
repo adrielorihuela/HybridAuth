@@ -26,5 +26,6 @@ to stop a specific mistake being repeated.
 | [offline-auth-postmortem.md](development/offline-auth-postmortem.md) | The first attempt, how the client failed, and the six causes. |
 | [offline-auth-requirements.md](development/offline-auth-requirements.md) | What the vanilla client demands per version: configuration phase, registries and tags, the PLAY spawn sequence, KeepAlive and timeouts. |
 | [offline-auth-plan.md](development/offline-auth-plan.md) | The architecture that was chosen, and the alternatives rejected. |
-| [auth-server.md](development/auth-server.md) | The vendored NanoLimbo subtree: layout, local patches and how to update it. |
+| [auth-server.md](development/auth-server.md) | The vendored NanoLimbo subtree: layout and local patches. |
+| [updating-upstreams.md](development/updating-upstreams.md) | How to pull changes from Velocity and NanoLimbo. |
 | [discarded/](development/discarded/) | Superseded analysis, kept for the reasoning it records. |

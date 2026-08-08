@@ -5,9 +5,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this repository is
 
 HybridVelocity is a fork of [Velocity](https://github.com/PaperMC/Velocity), the Minecraft
-server proxy. Most of the tree is upstream code. `docs/guide/` documents the fork for operators
-and `docs/development/` records why it is built the way it is — read `docs/development/README.md`
-before touching login, configuration or command code.
+server proxy. Most of the tree is upstream code.
+
+**Read the docs before changing anything in login, configuration, commands or the `:limbo`
+module.** They are not background reading — most of what is written there exists to stop a specific
+mistake being made twice.
+
+| Where | What it answers |
+| --- | --- |
+| `docs/guide/` | How an operator uses the fork. Start at `docs/guide/getting-started.md`. |
+| `docs/development/README.md` | Why the fork is built this way: the specification, the attempt that failed, the protocol research, the architecture chosen. |
+| `docs/development/updating-upstreams.md` | **How to pull changes from Velocity or NanoLimbo.** Read this before any upstream work — merging and rebasing are not interchangeable here. |
+| `docs/development/auth-server.md` | The vendored subtree, its two local patches, and why each exists. |
 
 Fork-specific behaviour:
 
@@ -30,6 +39,11 @@ upstream-named `velocity.toml` on first start. Permission nodes keep the `veloci
 they are identifiers operators have already granted, not branding.
 
 Keep diffs against upstream narrow so upstream merges stay manageable.
+
+`main` is a linear continuation of upstream Velocity's `dev/4.0.0`, so upstream changes are
+**merged**, never rebased in: the NanoLimbo subtree was imported with a merge commit that
+`git subtree pull` looks for, and rebasing would drop it and rewrite published history.
+`docs/development/updating-upstreams.md` has the procedure and the conflict-prone files.
 
 ## Commands
 
