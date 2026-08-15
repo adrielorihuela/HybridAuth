@@ -29,15 +29,16 @@ Geyser and Floodgate.
 
 ## Quick start
 
-Download `HybridVelocity-<version>-all.jar` from the
+Download `HybridVelocity-<version>.jar` from the
 [releases](https://github.com/adrielorihuela/HybridVelocity/releases) and run it:
 
 ```bash
-java -Xms512M -Xmx512M -jar HybridVelocity-1.1.0-all.jar
+java -Xms512M -Xmx512M -jar HybridVelocity-1.1.1.jar
 ```
 
 Upgrading from stock Velocity? Just swap the jar — your `velocity.toml` is renamed and migrated,
-contents intact.
+contents intact. Permissions keep working too: the `velocity.command.*` nodes are still honoured
+alongside the new `hybridvelocity.command.*` ones.
 
 Then read [docs/guide/getting-started.md](docs/guide/getting-started.md).
 
@@ -58,7 +59,7 @@ Anything not covered there behaves as upstream, so the
 ```
 
 Uses the Gradle wrapper (`./gradlew.bat` on Windows) and runs Checkstyle, Spotless and the tests.
-The runnable jar is `proxy/build/libs/HybridVelocity-<version>-all.jar`.
+The runnable jar is `proxy/build/libs/HybridVelocity-<version>.jar`. Java 25 is required.
 
 ## Upstream
 

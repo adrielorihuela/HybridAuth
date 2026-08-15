@@ -37,6 +37,10 @@ git fetch upstream
 git merge upstream/dev/4.0.0
 ```
 
+Done once already, at `00759e52` → `4772ca30` (five commits). The only conflict was
+`gradle/libs.versions.toml`, in two hunks of the same shape: upstream's version bumps against the
+fork's added dependencies. Resolving it means keeping both sides. Expect that shape again.
+
 `dev/4.0.0` is upstream's default branch and the one this fork is based on. `dev/5.0.0` exists and
 is a different major line — do not merge it without deciding that deliberately.
 
@@ -138,5 +142,4 @@ would rewrite NanoLimbo's GPL copyright notices to "Velocity Contributors".
    API version that plugins compile against.
 2. `./gradlew build`, then run the shaded jar and check the boot line and the authentication server.
 3. Tag `v<forkVersion>` and push the tag.
-4. Create the release with `HybridVelocity-<forkVersion>-all.jar`, renamed to
-   `HybridVelocity-<forkVersion>.jar` for the asset.
+4. Create the release with `HybridVelocity-<forkVersion>.jar`.

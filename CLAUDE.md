@@ -48,7 +48,7 @@ Keep diffs against upstream narrow so upstream merges stay manageable.
 ## Commands
 
 The Gradle wrapper is the entry point; on Windows use `./gradlew.bat`. The build targets a
-Java 25 toolchain (CI builds on JDK 21 and lets the toolchain resolve 25).
+Java 25 toolchain, and CI runs on JDK 25 too.
 
 ```bash
 ./gradlew build
@@ -75,8 +75,8 @@ Apply formatting — run before committing, the build fails on style violations.
 
 Run the proxy locally; it generates `hybridvelocity.toml`, `forwarding.secret` and `lang/` in
 `proxy/run/`. The build produces two jars in `proxy/build/libs/`:
-`HybridVelocity-<forkVersion>-all.jar` is the runnable distributable and the one to attach to a
-release; `HybridVelocity-<forkVersion>.jar` is the thin jar.
+`HybridVelocity-<forkVersion>.jar` is the runnable distributable and the one to attach to a
+release; `HybridVelocity-<forkVersion>-thin.jar` is not runnable and only feeds `shadowJar`.
 
 ### Versioning
 
@@ -89,6 +89,15 @@ Two versions coexist, and they are not interchangeable:
   proxy's `shadowJar` uses them for the archive name and manifest, and `VelocityServer#getVersion`
   reads that manifest, which is why the proxy logs `Booting up HybridVelocity <forkVersion>`.
   Bump `forkVersion` for a fork release and tag it `v<forkVersion>`.
+
+### Java 25 is a hard requirement
+
+Nothing sets `options.release`, so the toolchain's 25 is also the bytecode target and the jar will
+not load on anything older. The one exception is `proxy/src/bootstrap/`, a single-class source set
+compiled with `options.release = 8` that is the jar's `Main-Class`: it loads anywhere, checks
+`java.specification.version` and explains the problem instead of letting the classloader throw
+`UnsupportedClassVersionError`. It reaches the real entry point by reflection so the Java 25 classes
+are not linked before the check passes, and it must stay free of anything newer than Java 8.
 
 ## Architecture
 
@@ -124,7 +133,7 @@ built-in commands, loads the configuration, registers servers, loads plugins, fi
 `ProxyInitializeEvent` and binds. Note the ordering constraint: built-in commands are
 registered *before* the config is loaded, so anything that depends on configuration (like the
 server shortcut commands) must be registered after the server-registration loop.
-`reloadConfiguration()` is the mirror image for `/velocity reload` and must be updated
+`reloadConfiguration()` is the mirror image for `/hybridvelocity reload` and must be updated
 whenever startup gains configuration-derived state.
 
 `VelocityConfiguration` deserializes `hybridvelocity.toml` with night-config, using
@@ -193,10 +202,27 @@ database lookup — the `requires` predicates run earlier, while the answer is s
 ### Commands and permissions
 
 Commands are Brigadier nodes registered through `VelocityCommandManager`, which lowercases
-aliases (so commands are case-insensitive regardless of the literal's casing). Permissions are
-tri-state: `getPermissionValue` returns `Tristate`, and the codebase uses two deliberate
-styles — `!= Tristate.FALSE` for commands everyone should have unless denied (`/server`, the
-server shortcuts) and `== Tristate.TRUE` for privileged ones (`/velocity`, `/glist`).
+aliases (so commands are case-insensitive regardless of the literal's casing). The proxy's own
+command is `/hybridvelocity`, with `hv` and `velocity` as aliases.
+
+Permissions are tri-state and are checked **only** through the two helpers in
+`command/builtin/BuiltinCommandUtil.java`, never by calling `getPermissionValue` directly. Nodes are
+`hybridvelocity.command.*`, and each helper also consults the pre-rename `velocity.command.*` node so
+that renaming did not revoke anything operators had already granted:
+
+- `isAllowed` — privileged commands. Granted only if a node says so, and the legacy node is read
+  only when the current one is unset, so an explicit deny always wins.
+- `isNotDenied` — `/server` and the per-server shortcuts, which everyone has unless denied. **Either**
+  node saying no denies. A plain OR here would stop honouring a pre-rename
+  `-velocity.command.server.<name>`, which is why the two helpers exist rather than one.
+
+**`velocity.command.*` also happens to be the prefix of the translation keys** in
+`messages*.properties`. They are not permissions. A blanket rename across that prefix would rewrite
+34 locale files and break anyone overriding a translation.
+
+Equally off-limits: the `com.velocitypowered` packages, the `velocity-api`/`velocity-proxy` module
+names, the `velocity:player_info` forwarding channel that Paper hardcodes, and the `"velocity"`
+virtual-plugin id that plugins declare as a dependency.
 
 ### Translations
 
