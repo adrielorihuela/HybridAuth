@@ -5,12 +5,35 @@ still applies — this page only covers what is different.
 
 ## Install
 
-Download `HybridVelocity-<version>-all.jar` from the
+**Java 25 or newer is required.** Nothing else works — the whole proxy is compiled for it. Starting
+on an older runtime prints a message telling you so rather than a stack trace.
+
+Download `HybridVelocity-<version>.jar` from the
 [releases](https://github.com/adrielorihuela/HybridVelocity/releases) and run it:
 
 ```bash
-java -Xms512M -Xmx512M -jar HybridVelocity-1.1.0-all.jar
+java -Xms512M -Xmx512M -jar HybridVelocity-1.1.1.jar
 ```
+
+### Getting more out of the same machine
+
+A proxy forwards packets; it does not simulate a world. That makes it allocation-heavy and
+latency-sensitive rather than throughput-bound, so the useful tuning is a small heap that is
+collected quickly:
+
+```bash
+java -Xms512M -Xmx512M \
+     -XX:+UseG1GC -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=4M \
+     -jar HybridVelocity-1.1.1.jar
+```
+
+Set `-Xms` equal to `-Xmx` so the heap is never resized at runtime. 512 MB is plenty for a few
+hundred players; giving a proxy several gigabytes makes pauses worse, not better, because the
+collector has more to walk.
+
+On Linux the proxy uses epoll or io_uring automatically, and native compression and encryption when
+available — those are already on and need no flags. The log line at startup tells you which it
+picked.
 
 On first start it creates:
 

@@ -9,8 +9,23 @@ plugins {
 }
 
 application {
-    mainClass.set("com.velocitypowered.proxy.Velocity")
-    applicationDefaultJvmArgs += listOf("-Dvelocity.packet-decode-logging=true")
+    mainClass.set("com.velocitypowered.proxy.bootstrap.Bootstrap")
+}
+
+// A one-class source set compiled for Java 8 so that it loads on any JVM. Everything else targets
+// Java 25, so without this an operator on an older runtime gets a bare UnsupportedClassVersionError
+// naming an internal class. See Bootstrap.java.
+val bootstrap: SourceSet by sourceSets.creating
+
+tasks.named<JavaCompile>(bootstrap.compileJavaTaskName) {
+    options.release = 8
+    // `release 8` is obsolete and javac says so; that is the point of this source set.
+    options.compilerArgs.add("-Xlint:-options")
+}
+
+sourceSets.test {
+    compileClasspath += bootstrap.output
+    runtimeClasspath += bootstrap.output
 }
 
 // Name and version of this fork, used for the distributable JAR and the version the proxy
@@ -31,7 +46,10 @@ tasks {
         archiveVersion.set(forkVersion)
         archiveClassifier.set("thin")
 
+        from(bootstrap.output)
+
         manifest {
+            attributes["Main-Class"] = "com.velocitypowered.proxy.bootstrap.Bootstrap"
             attributes["Implementation-Title"] = forkName
             attributes["Implementation-Vendor"] = "HybridVelocity Contributors"
             attributes["Multi-Release"] = "true"
@@ -44,7 +62,12 @@ tasks {
         archiveVersion.set(forkVersion)
         archiveClassifier.set("")
 
+        // shadowJar builds from the main source set, not from the jar task, so the Java 8
+        // bootstrap has to be added here as well or the entry point is missing from the jar.
+        from(bootstrap.output)
+
         manifest {
+            attributes["Main-Class"] = "com.velocitypowered.proxy.bootstrap.Bootstrap"
             attributes["Implementation-Title"] = forkName
             attributes["Implementation-Vendor"] = "HybridVelocity Contributors"
             attributes["Implementation-Version"] = forkVersion
@@ -70,7 +93,6 @@ tasks {
     runShadow {
         workingDir = file("run").also(File::mkdirs)
         standardInput = System.`in`
-        jvmArgs("-Dvelocity.packet-decode-logging=true")
     }
     named<JavaExec>("run") {
         workingDir = file("run").also(File::mkdirs)
