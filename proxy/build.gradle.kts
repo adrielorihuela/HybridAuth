@@ -25,9 +25,11 @@ tasks {
     }
 
     jar {
-        // The thin jar: HybridVelocity-<forkVersion>.jar
+        // The thin jar: HybridVelocity-<forkVersion>-thin.jar. It is not runnable and exists only
+        // as an input to shadowJar; the classifier keeps it from being mistaken for the real one.
         archiveBaseName.set(forkName)
         archiveVersion.set(forkVersion)
+        archiveClassifier.set("thin")
 
         manifest {
             attributes["Implementation-Title"] = forkName
@@ -37,10 +39,10 @@ tasks {
     }
 
     shadowJar {
-        // The runnable distributable: HybridVelocity-<forkVersion>-all.jar
+        // The runnable distributable: HybridVelocity-<forkVersion>.jar
         archiveBaseName.set(forkName)
         archiveVersion.set(forkVersion)
-        archiveClassifier.set("all")
+        archiveClassifier.set("")
 
         manifest {
             attributes["Implementation-Title"] = forkName

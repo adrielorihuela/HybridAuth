@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -i \"readme\\\\|\\\\.md$\")",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git ls-remote *)",
+      "Bash(gh auth *)",
+      "PowerShell($c = Get-Command gh -ErrorAction SilentlyContinue; if \\($c\\) { $c.Source; gh auth status } else { \"gh not installed\" })",
+      "Bash(git branch *)",
+      "Bash(set -e)",
+      "Bash(git reset *)",
+      "Bash(git cherry-pick *)",
+      "Bash(echo \"EXIT_DIFF=$?\")",
+      "Bash(ls -d .cursor .cursorrules .github/copilot-instructions.md .codex .gemini GEMINI.md ~/.codex/config.toml ~/.gemini/settings.json 2>/dev/null; echo \"---settings---\"; cat settings.gradle.kts 2>/dev/null | head -30; echo \"---ci---\"; ls .github/workflows/ 2>/dev/null)",
+      "Bash(./gradlew.bat build *)",
+      "PowerShell(winget install --id GitHub.cli --silent --accept-package-agreements --accept-source-agreements 2>&1)",
+      "PowerShell($gh = \"$env:ProgramFiles\\\\GitHub CLI\\\\gh.exe\"; if \\(Test-Path $gh\\) { & $gh --version; & $gh auth status 2>&1 } else { \"not at $gh\"; Get-Command gh -ErrorAction SilentlyContinue })",
+      "Bash(git config *)",
+      "Bash(git tag -a v1.0.0 -m 'HybridVelocity 1.0.0 *)",
+      "Bash(git tag *)",
+      "Bash(git push *)"
+    ]
+  }
+}
