@@ -17,6 +17,7 @@
 
 package com.velocitypowered.proxy.bootstrap;
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 /**
@@ -64,7 +65,20 @@ public final class Bootstrap {
 
     // Reflection, so the Java 25 classes are not linked while this method is being verified.
     final Method main = Class.forName(MAIN_CLASS).getMethod("main", String[].class);
-    main.invoke(null, (Object) args);
+    try {
+      main.invoke(null, (Object) args);
+    } catch (InvocationTargetException e) {
+      // Without this, every startup failure surfaces as an InvocationTargetException wrapping the
+      // real one, which buries the actual cause under this class's frames.
+      final Throwable cause = e.getCause();
+      if (cause instanceof RuntimeException) {
+        throw (RuntimeException) cause;
+      }
+      if (cause instanceof Error) {
+        throw (Error) cause;
+      }
+      throw cause instanceof Exception ? (Exception) cause : e;
+    }
   }
 
   /**

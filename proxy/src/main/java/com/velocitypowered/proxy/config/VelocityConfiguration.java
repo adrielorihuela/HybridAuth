@@ -199,8 +199,13 @@ public class VelocityConfiguration implements ProxyConfig {
     }
 
     for (String s : servers.getServerCommands()) {
-      if (!servers.getServers().containsKey(s)) {
-        logger.error("Server command '{}' is not registered in your configuration!", s);
+      // Compared without case, because that is how server names behave everywhere else: ServerMap
+      // keys them lowercased, so `Lobby` and `lobby` are the same server. Matching exactly here
+      // meant the shipped default of comandos = ["lobby"] refused to start for anyone whose server
+      // was named `Lobby`.
+      if (servers.getServers().keySet().stream().noneMatch(s::equalsIgnoreCase)) {
+        logger.error("Server command '{}' has no matching server in [servers]. Add it there, or "
+            + "remove it from 'comandos'.", s);
         valid = false;
       }
     }
