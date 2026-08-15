@@ -27,7 +27,6 @@ import com.mojang.brigadier.tree.CommandNode;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.velocitypowered.api.command.BrigadierCommand;
 import com.velocitypowered.api.command.CommandSource;
-import com.velocitypowered.api.permission.Tristate;
 import com.velocitypowered.api.plugin.PluginContainer;
 import com.velocitypowered.api.plugin.PluginDescription;
 import com.velocitypowered.api.proxy.ProxyServer;
@@ -71,30 +70,30 @@ import org.apache.logging.log4j.Logger;
  * Implements the {@code /velocity} command and friends.
  */
 public final class VelocityCommand {
-  private static final String USAGE = "/velocity <%s>";
+  private static final String USAGE = "/hybridvelocity <%s>";
 
   @SuppressWarnings("checkstyle:MissingJavadocMethod")
   public static BrigadierCommand create(final VelocityServer server) {
     final LiteralCommandNode<CommandSource> dump = BrigadierCommand.literalArgumentBuilder("dump")
-        .requires(source -> source.getPermissionValue("velocity.command.dump") == Tristate.TRUE)
+        .requires(source -> BuiltinCommandUtil.isAllowed(source, "dump"))
         .executes(new Dump(server))
         .build();
     final LiteralCommandNode<CommandSource> heap = BrigadierCommand.literalArgumentBuilder("heap")
-        .requires(source -> source.getPermissionValue("velocity.command.heap") == Tristate.TRUE)
+        .requires(source -> BuiltinCommandUtil.isAllowed(source, "heap"))
         .executes(new Heap())
         .build();
     final LiteralCommandNode<CommandSource> info = BrigadierCommand.literalArgumentBuilder("info")
-        .requires(source -> source.getPermissionValue("velocity.command.info") == Tristate.TRUE)
+        .requires(source -> BuiltinCommandUtil.isAllowed(source, "info"))
         .executes(new Info(server))
         .build();
     final LiteralCommandNode<CommandSource> plugins = BrigadierCommand
         .literalArgumentBuilder("plugins")
-        .requires(source -> source.getPermissionValue("velocity.command.plugins") == Tristate.TRUE)
+        .requires(source -> BuiltinCommandUtil.isAllowed(source, "plugins"))
         .executes(new Plugins(server))
         .build();
     final LiteralCommandNode<CommandSource> reload = BrigadierCommand
         .literalArgumentBuilder("reload")
-        .requires(source -> source.getPermissionValue("velocity.command.reload") == Tristate.TRUE)
+        .requires(source -> BuiltinCommandUtil.isAllowed(source, "reload"))
         .executes(new Reload(server))
         .build();
 
@@ -103,7 +102,7 @@ public final class VelocityCommand {
     return new BrigadierCommand(
       commands.stream()
         .reduce(
-          BrigadierCommand.literalArgumentBuilder("velocity")
+          BrigadierCommand.literalArgumentBuilder("hybridvelocity")
             .executes(ctx -> {
               final CommandSource source = ctx.getSource();
               final String availableCommands = commands.stream()

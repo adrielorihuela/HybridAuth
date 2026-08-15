@@ -25,7 +25,6 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.ArgumentCommandNode;
 import com.velocitypowered.api.command.BrigadierCommand;
 import com.velocitypowered.api.command.CommandSource;
-import com.velocitypowered.api.permission.Tristate;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.ServerConnection;
@@ -56,8 +55,7 @@ public class SendCommand {
   public void register() {
     final LiteralArgumentBuilder<CommandSource> rootNode = BrigadierCommand
         .literalArgumentBuilder("send")
-        .requires(source ->
-            source.getPermissionValue("velocity.command.send") == Tristate.TRUE)
+        .requires(source -> BuiltinCommandUtil.isAllowed(source, "send"))
         .executes(this::usage);
     final RequiredArgumentBuilder<CommandSource, String> playerNode = BrigadierCommand
         .requiredArgumentBuilder(PLAYER_ARG, StringArgumentType.word())

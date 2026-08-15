@@ -27,7 +27,6 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.ArgumentCommandNode;
 import com.velocitypowered.api.command.BrigadierCommand;
 import com.velocitypowered.api.command.CommandSource;
-import com.velocitypowered.api.permission.Tristate;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
@@ -60,8 +59,7 @@ public class GlistCommand {
   public void register() {
     final LiteralArgumentBuilder<CommandSource> rootNode = BrigadierCommand
         .literalArgumentBuilder("glist")
-        .requires(source ->
-            source.getPermissionValue("velocity.command.glist") == Tristate.TRUE)
+        .requires(source -> BuiltinCommandUtil.isAllowed(source, "glist"))
         .executes(this::totalCount);
     final ArgumentCommandNode<CommandSource, String> serverNode = BrigadierCommand
         .requiredArgumentBuilder(SERVER_ARG, StringArgumentType.string())

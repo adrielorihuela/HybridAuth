@@ -277,6 +277,9 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
     commandManager.register(
         commandManager.metaBuilder(velocityParentCommand)
             .plugin(VelocityVirtualPlugin.INSTANCE)
+            // `hv` because the full name is a mouthful, `velocity` because that is what anyone
+            // coming from upstream will type.
+            .aliases("hv", "velocity")
             .build(),
         velocityParentCommand
     );

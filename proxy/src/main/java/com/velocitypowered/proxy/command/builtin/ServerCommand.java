@@ -24,7 +24,6 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.velocitypowered.api.command.BrigadierCommand;
 import com.velocitypowered.api.command.CommandSource;
-import com.velocitypowered.api.permission.Tristate;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.ServerConnection;
@@ -52,7 +51,7 @@ public final class ServerCommand {
     final LiteralCommandNode<CommandSource> node = BrigadierCommand
         .literalArgumentBuilder("server")
         .requires(src -> src instanceof Player
-                && src.getPermissionValue("velocity.command.server") != Tristate.FALSE)
+                && BuiltinCommandUtil.isNotDenied(src, "server"))
         .executes(ctx -> {
           final Player player = (Player) ctx.getSource();
           outputServerInformation(player, server);

@@ -43,15 +43,15 @@ Rules:
 
 ## Permissions
 
-Each command checks the permission `velocity.command.server.<server name in lowercase>` —
-for example `velocity.command.server.lobby`.
+Each command checks the permission `hybridvelocity.command.server.<server name in lowercase>` —
+for example `hybridvelocity.command.server.lobby`.
 
 The check follows the same permissive style as Velocity's own `/server` command: the
 command is allowed unless the permission is explicitly set to **false**. That means:
 
 * With no permissions plugin installed, every player can use every configured command.
 * A permissions plugin can hide and block a specific command by negating its node, for
-  example `-velocity.command.server.lobby` in LuckPerms.
+  example `-hybridvelocity.command.server.lobby` in LuckPerms.
 * Granting the node explicitly also works, and is a no-op unless something else denies it.
 
 Because each server has its own node, per-server access can be given to different ranks

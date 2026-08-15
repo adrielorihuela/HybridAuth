@@ -21,7 +21,6 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.velocitypowered.api.command.BrigadierCommand;
 import com.velocitypowered.api.command.CommandSource;
-import com.velocitypowered.api.permission.Tristate;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.ServerConnection;
@@ -47,20 +46,20 @@ public final class ServerShortcutCommand {
    * Creates the shortcut command for the given server.
    *
    * <p>The command is available to every player unless a permissions plugin explicitly denies
-   * {@code velocity.command.server.<server name>}, matching how {@code /server} behaves.</p>
+   * {@code hybridvelocity.command.server.<server name>}, matching how {@code /server} behaves. The
+   * pre-rename {@code velocity.} node is still honoured, so an existing deny keeps working.</p>
    *
    * @param proxy      the proxy the player will be moved on
    * @param serverName the name of the server, as configured in {@code [servers]}
    * @return the command to register
    */
   public static BrigadierCommand create(final ProxyServer proxy, final String serverName) {
-    final String permission =
-        "velocity.command.server." + serverName.toLowerCase(Locale.ROOT);
+    final String permissionSuffix = "server." + serverName.toLowerCase(Locale.ROOT);
 
     final LiteralCommandNode<CommandSource> node = BrigadierCommand
         .literalArgumentBuilder(serverName)
         .requires(src -> src instanceof Player
-            && src.getPermissionValue(permission) != Tristate.FALSE)
+            && BuiltinCommandUtil.isNotDenied(src, permissionSuffix))
         .executes(ctx -> {
           final Player player = (Player) ctx.getSource();
           final Optional<RegisteredServer> toConnect = proxy.getServer(serverName);

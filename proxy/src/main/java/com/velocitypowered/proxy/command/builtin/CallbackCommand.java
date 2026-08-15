@@ -34,7 +34,7 @@ public final class CallbackCommand implements Command<CommandSource> {
   @SuppressWarnings("checkstyle:MissingJavadocMethod")
   public static BrigadierCommand create() {
     final LiteralCommandNode<CommandSource> node = BrigadierCommand
-        .literalArgumentBuilder("velocity:callback")
+        .literalArgumentBuilder("hybridvelocity:callback")
         .then(BrigadierCommand.requiredArgumentBuilder("id", StringArgumentType.word())
                 .executes(new CallbackCommand()))
         .build();
