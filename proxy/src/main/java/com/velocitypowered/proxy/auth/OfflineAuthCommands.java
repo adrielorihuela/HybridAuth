@@ -111,8 +111,10 @@ public final class OfflineAuthCommands {
     final String usage = "Usage: /changepassword <current password> <new password> <new password>";
     final LiteralCommandNode<CommandSource> node = BrigadierCommand
         .literalArgumentBuilder("changepassword")
+        // isSubjectToAuth, not isOnlineMode: a Bedrock player is offline-mode but has no
+        // password here, so offering them this command would make no sense.
         .requires(source -> source instanceof Player player
-            && !player.isOnlineMode() && !gate.isGated(player))
+            && gate.isSubjectToAuth(player) && !gate.isGated(player))
         .executes(ctx -> usage(ctx.getSource(), usage))
         .then(BrigadierCommand.requiredArgumentBuilder(PASSWORD, StringArgumentType.word())
             .executes(ctx -> usage(ctx.getSource(), usage))

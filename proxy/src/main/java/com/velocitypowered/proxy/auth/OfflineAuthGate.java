@@ -79,21 +79,38 @@ public final class OfflineAuthGate {
 
   private final VelocityServer server;
   private final OfflineAuthManager manager;
+  private final BedrockPlayers bedrockPlayers;
   private final Map<UUID, ScheduledTask> timeouts = new ConcurrentHashMap<>();
 
   public OfflineAuthGate(final VelocityServer server, final OfflineAuthManager manager) {
     this.server = server;
     this.manager = manager;
+    this.bedrockPlayers = new BedrockPlayers(server.getPluginManager());
+  }
+
+  /**
+   * Whether this player is somebody this proxy is responsible for authenticating at all.
+   *
+   * <p>Premium players are not: Mojang vouched for them. Neither are players arriving through
+   * GeyserMC, whom Floodgate has already authenticated against Xbox Live — asking them for a
+   * password would be asking a second time for an identity somebody else already verified. That
+   * exemption is deliberately not configurable; see {@link BedrockPlayers}.</p>
+   *
+   * @param player the player
+   * @return {@code true} if this proxy is the one that must vouch for them
+   */
+  public boolean isSubjectToAuth(final Player player) {
+    return !player.isOnlineMode() && !bedrockPlayers.isBedrock(player.getUniqueId());
   }
 
   /**
    * Whether this player must authenticate before reaching a real server.
    *
    * @param player the player
-   * @return {@code true} for offline players that have not authenticated in this session
+   * @return {@code true} for players we are responsible for who have not authenticated yet
    */
   public boolean isGated(final Player player) {
-    return !player.isOnlineMode() && !manager.isAuthenticated(player.getUniqueId());
+    return isSubjectToAuth(player) && !manager.isAuthenticated(player.getUniqueId());
   }
 
   /** Redirects gated players to the authentication server, whatever the destination was. */
