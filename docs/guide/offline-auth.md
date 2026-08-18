@@ -6,7 +6,8 @@ proxy** — there is no extra server to install, configure or monitor.
 
 This is **on by default**. Updating an existing installation turns it on.
 
-Premium players are unaffected: they connect exactly as they do on stock Velocity.
+Premium players are unaffected: they connect exactly as they do on stock Velocity. **Neither are
+Bedrock players** arriving through Geyser — see below.
 
 This implements the specification in [update-plan.md](../development/offline-auth-specification.md). For why it is built this way,
 see [offline-auth-plan.md](../development/offline-auth-plan.md); for the authentication server itself, see
@@ -92,6 +93,31 @@ Tip: Use /changepassword to change your password.
 `/changepassword <current password> <new password> <new password>` is available to authenticated
 offline players.
 
+## Bedrock players are never asked
+
+Players who join through GeyserMC have already been authenticated by Floodgate against Xbox Live.
+Asking them for a password would be asking a second time for an identity somebody else has already
+verified, and it would ask for it in a chat window that is awkward to use on a phone or a console
+controller. The proxy therefore never authenticates them.
+
+**This is not configurable.** There is no option to turn it off, because there is no situation in
+which asking twice is the right answer. Their security is Geyser and Floodgate's business: keep
+Floodgate configured as you would on any other proxy.
+
+They are recognised two ways, and either one is enough:
+
+- **Floodgate's own API**, when the plugin is installed. This is the authoritative answer, and the
+  only one that recognises a Bedrock player who has **linked a Java account** — linked players keep
+  their real Java UUID, so nothing about their identity looks like Bedrock.
+- **The shape of the UUID.** Floodgate builds an unlinked Bedrock player's UUID from their XUID with
+  the top half left at zero. Java's offline UUIDs can never have that shape, so the two cannot be
+  confused. This covers the case where Floodgate is present but its API cannot be reached.
+
+If Floodgate is not installed at all, nobody is coming in through Geyser and nothing is exempted.
+
+You will see `Floodgate detected; Bedrock players will skip offline authentication.` in the console
+the first time the proxy has to decide about somebody.
+
 ## How identity works
 
 Offline players get a `.` appended to their username and an offline UUID derived from that dotted
@@ -126,6 +152,9 @@ Because the failure is loud and total, check the console after enabling this for
 - **The camera is not locked.** Players can look around, but since the authentication server sends
   no chunks at all, the only thing rendered is the End's sky — a fixed dark backdrop with no sun,
   moon, clouds or horizon — so there is nothing to see moving.
+- **A linked Bedrock player needs the Floodgate API to be reachable.** If Floodgate is installed
+  but its API cannot be resolved, the proxy logs a warning and falls back to the UUID shape — which
+  recognises unlinked Bedrock players but not linked ones, who would then be asked to register.
 - There is no password recovery. A player who forgets their password needs an operator to delete
   their row from `offline_player_auth`.
 - There is no rate limiting on `/register` beyond the three-strike login lockout, and no IP-based

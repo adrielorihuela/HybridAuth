@@ -39,12 +39,12 @@ class BedrockPlayersTest {
   private static final UUID UNLINKED_BEDROCK = new UUID(0L, 1234567890L);
 
   @Test
-  void anUnlinkedBedrockUuidIsRecognisedWithoutFloodgate() {
+  void unlinkedBedrockUuidIsRecognisedWithoutFloodgate() {
     assertTrue(new BedrockPlayers(noPlugins()).isBedrock(UNLINKED_BEDROCK));
   }
 
   @Test
-  void anOfflineJavaUuidIsNotMistakenForBedrock() {
+  void offlineJavaUuidIsNotMistakenForBedrock() {
     // Offline Java UUIDs are type 3, so their version bits sit in the half Floodgate leaves at
     // zero. The two shapes cannot collide.
     assertFalse(BedrockPlayers.hasBedrockUuidShape(UuidUtils.generateOfflinePlayerUuid("Steve")));
@@ -53,12 +53,12 @@ class BedrockPlayersTest {
   }
 
   @Test
-  void aPremiumUuidIsNotMistakenForBedrock() {
+  void premiumUuidIsNotMistakenForBedrock() {
     assertFalse(new BedrockPlayers(noPlugins()).isBedrock(UUID.randomUUID()));
   }
 
   @Test
-  void aMissingUuidIsNotBedrock() {
+  void missingUuidIsNotBedrock() {
     assertFalse(new BedrockPlayers(noPlugins()).isBedrock(null));
     assertFalse(BedrockPlayers.hasBedrockUuidShape(null));
   }
@@ -85,7 +85,7 @@ class BedrockPlayersTest {
   }
 
   @Test
-  void anUnusableFloodgateFallsBackInsteadOfThrowing() {
+  void unusableFloodgateFallsBackInsteadOfThrowing() {
     // A plugin under the right id whose instance has no FloodgateApi behind it at all.
     final BedrockPlayers players = new BedrockPlayers(withFloodgate("not really floodgate"));
 
@@ -94,7 +94,7 @@ class BedrockPlayersTest {
   }
 
   @Test
-  void aFloodgateThatExposesNoInstanceFallsBack() {
+  void floodgateThatExposesNoInstanceFallsBack() {
     final PluginContainer container = mock(PluginContainer.class);
     doReturn(Optional.empty()).when(container).getInstance();
     final PluginManager manager = mock(PluginManager.class);

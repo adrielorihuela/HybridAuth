@@ -82,6 +82,12 @@ public final class OfflineAuthGate {
   private final BedrockPlayers bedrockPlayers;
   private final Map<UUID, ScheduledTask> timeouts = new ConcurrentHashMap<>();
 
+  /**
+   * Creates the gate.
+   *
+   * @param server the proxy, used for the authentication server, the scheduler and plugin lookups
+   * @param manager the manager holding registrations and authenticated sessions
+   */
   public OfflineAuthGate(final VelocityServer server, final OfflineAuthManager manager) {
     this.server = server;
     this.manager = manager;

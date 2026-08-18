@@ -24,6 +24,10 @@ that name, so they can never be mistaken for the premium account of the same nam
 **A command per server.** List a server under `comandos` and players get `/lobby` instead of
 `/server lobby`, permission-controlled per server.
 
+**Bedrock players are left alone.** Anyone arriving through Geyser has already been authenticated
+by Floodgate, so the proxy never asks them to register. That is not an option you have to find; it
+is simply how it behaves.
+
 Everything else is Velocity: same plugins, same API, same performance. Works with ViaVersion,
 Geyser and Floodgate.
 

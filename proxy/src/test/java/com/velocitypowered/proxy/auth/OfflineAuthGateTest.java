@@ -34,7 +34,7 @@ import org.junit.jupiter.api.Test;
 class OfflineAuthGateTest {
 
   @Test
-  void anOfflinePlayerIsHeldUntilTheyAuthenticate() {
+  void offlinePlayerIsHeldUntilTheyAuthenticate() {
     final OfflineAuthGate gate = gate();
     final Player player = player(false, UuidUtils.generateOfflinePlayerUuid("Steve"));
 
@@ -43,7 +43,7 @@ class OfflineAuthGateTest {
   }
 
   @Test
-  void aPremiumPlayerIsNeverAsked() {
+  void premiumPlayerIsNeverAsked() {
     final OfflineAuthGate gate = gate();
     final Player player = player(true, UUID.randomUUID());
 
@@ -52,7 +52,7 @@ class OfflineAuthGateTest {
   }
 
   @Test
-  void aBedrockPlayerIsNeverAsked() {
+  void bedrockPlayerIsNeverAsked() {
     // They reach the proxy in offline mode, because Floodgate forces it in PreLoginEvent — which
     // is exactly why they used to end up on the authentication server. Geyser and Floodgate have
     // already verified them against Xbox Live.

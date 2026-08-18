@@ -192,6 +192,17 @@ hidden from command output through `server/InternalServers.java` instead — add
 player-facing server listing to that filter rather than un-registering things. Its name comes from
 `[offline-auth] server-name`, so `InternalServers` is told it at start-up, not a constant.
 
+**Bedrock players are never gated** (`auth/BedrockPlayers.java`). Geyser reaches the proxy through
+Floodgate's `PreLoginEvent.forceOfflineMode()`, so those players are offline-mode and used to fall
+straight into the gate. Detection has two paths on purpose: Floodgate's API is the authoritative one
+and the only one that recognises a player who *linked* a Java account, while the UUID shape (top 64
+bits zero, which a Java offline UUID can never have) is the fallback. A yes from either is enough,
+and no reflective failure may throw — being wrong here must not stop somebody logging in. The API is
+reached with `Class.forName(name, false, pluginInstance.getClass().getClassLoader())`: the proxy's
+own loader is `PluginClassLoader`'s *parent*, and delegation never runs parent to child, so a plain
+`Class.forName` cannot see plugin classes. The gate exposes `isSubjectToAuth` alongside `isGated` —
+`/changepassword` repeats the check itself instead of asking `isGated`, so it needs the former.
+
 **`/register` and `/login` are load-bearing.** They are the only way past the gate, so they carry no
 permission node (nothing for a permissions plugin to revoke), are re-allowed at `PostOrder.LAST` if
 another plugin's `CommandExecuteEvent` listener denies them, and are re-registered after
