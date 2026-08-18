@@ -80,12 +80,14 @@ public final class BedrockPlayers {
     }
 
     final FloodgateApiHandle handle = resolveFloodgate().orElse(null);
-    if (handle != null) {
-      final Boolean answer = handle.isFloodgatePlayer(uuid);
-      if (answer != null) {
-        return answer;
-      }
+    if (handle != null && Boolean.TRUE.equals(handle.isFloodgatePlayer(uuid))) {
+      return true;
     }
+    // The shape check stays in play even when Floodgate answered no. Nothing but Floodgate hands
+    // out a UUID shaped like this, so a "no" about one is a disagreement to resolve in the
+    // player's favour: the cost of exempting somebody wrongly is that one account keeps the
+    // password it does not have, while the cost of gating a Bedrock player is that they cannot
+    // play at all.
     return hasBedrockUuidShape(uuid);
   }
 
