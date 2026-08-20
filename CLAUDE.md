@@ -16,7 +16,7 @@ mistake being made twice.
 | `docs/guide/` | How an operator uses the fork. Start at `docs/guide/getting-started.md`. |
 | `docs/development/README.md` | Why the fork is built this way: the specification, the attempt that failed, the protocol research, the architecture chosen. |
 | `docs/development/updating-upstreams.md` | **How to pull changes from Velocity or NanoLimbo.** Read this before any upstream work — merging and rebasing are not interchangeable here. |
-| `docs/development/auth-server.md` | The vendored subtree, its two local patches, and why each exists. |
+| `docs/development/auth-server.md` | The vendored subtree, its three local patches, and why each exists. |
 
 Fork-specific behaviour:
 
@@ -177,7 +177,7 @@ assume the native path is available. `limbo/` is vendored third-party source —
 `limbo/upstream/` is a pristine `git subtree` of [NanoLimbo](https://github.com/Nan1t/NanoLimbo)
 (GPL-3.0, same licence as this fork). The module's build script sits *outside* the subtree and
 points `sourceSets` into it, so upstream stays byte-identical and `git subtree pull` does not
-conflict. Two upstream files carry local patches, both marked `HybridVelocity patch:` and listed
+conflict. Three upstream files carry local patches, both marked `HybridVelocity patch:` and listed
 in `docs/development/auth-server.md` — keep that list accurate and the patch surface small.
 
 **Checkstyle is disabled and Spotless excludes `upstream/**` for that module.** This is a
