@@ -4,6 +4,10 @@ plugins {
     id("velocity-spotless") apply false
 }
 
+// Fork-specific: ./gradlew updateUpstreams. Kept in its own file so this upstream-owned script
+// stays a one-line diff to resolve when upstream changes it.
+apply(from = "gradle/upstreams.gradle.kts")
+
 subprojects {
     apply<JavaLibraryPlugin>()
 
