@@ -177,7 +177,7 @@ assume the native path is available. `limbo/` is vendored third-party source —
 `limbo/upstream/` is a pristine `git subtree` of [NanoLimbo](https://github.com/Nan1t/NanoLimbo)
 (GPL-3.0, same licence as this fork). The module's build script sits *outside* the subtree and
 points `sourceSets` into it, so upstream stays byte-identical and `git subtree pull` does not
-conflict. Three upstream files carry local patches, both marked `HybridVelocity patch:` and listed
+conflict. Three upstream files carry local patches, each marked `HybridVelocity patch:` and listed
 in `docs/development/auth-server.md` — keep that list accurate and the patch surface small.
 
 **Checkstyle is disabled and Spotless excludes `upstream/**` for that module.** This is a
