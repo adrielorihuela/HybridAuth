@@ -45,6 +45,20 @@ Keep diffs against upstream narrow so upstream merges stay manageable.
 `git subtree pull` looks for, and rebasing would drop it and rewrite published history.
 `docs/development/updating-upstreams.md` has the procedure and the conflict-prone files.
 
+## Committing is not optional
+
+**Commit every change, and push every commit.** Not at the end of a session, not once the feature
+works — as each piece is finished. Two reasons, and the second one is the important one:
+
+1. The commits are the record of how the work was done. A single commit at the end throws away the
+   reasoning, and this repository leans hard on commit messages explaining *why*.
+2. **Everything not pushed exists on exactly one computer.** A push is the backup. If the machine
+   dies mid-project, whatever was pushed survives and the rest does not. Pushing also lets progress
+   be watched in real time rather than reported afterwards.
+
+So: `git commit`, then `git push`, every time. Do not batch them, and do not leave commits sitting
+unpushed while moving on to the next thing.
+
 ## Commands
 
 The Gradle wrapper is the entry point; on Windows use `./gradlew.bat`. The build targets a
@@ -68,6 +82,17 @@ Run one test class (drop `--tests` for the whole proxy module). Modules are name
 ```
 
 Apply formatting — run before committing, the build fails on style violations.
+
+```bash
+./gradlew updateUpstreams
+```
+
+Update both upstreams: adds the `upstream` and `limbo-upstream` remotes if a clone is missing them,
+merges Velocity, pulls the NanoLimbo subtree with the flags it requires, and prints what to check
+afterwards. It refuses to run on a dirty tree, mid-merge, or off `main`, leaves a conflicted merge
+in progress rather than aborting it, and never pushes. `addUpstreams`, `updateVelocity` and
+`updateAuthServer` are the individual steps. Defined in `gradle/upstreams.gradle.kts`; the
+reasoning is in `docs/development/updating-upstreams.md`.
 
 ```bash
 ./gradlew :velocity-proxy:runShadow
@@ -254,4 +279,5 @@ package under `*/src/test/java` and name methods by behaviour
 (`hybridOfflineProfileUsesDottedNameForUuid`, `serverCommandsListIsNotTreatedAsServerEntry`).
 
 Commits use concise imperative subjects, optionally with a `feat:`/`docs:` scope or an issue
-reference. Keep each commit cohesive.
+reference. Keep each commit cohesive — and see **Committing is not optional** above: one commit per
+change, and a push behind every commit.
