@@ -9,6 +9,41 @@ rediscover it.
 | `upstream` | [PaperMC/Velocity](https://github.com/PaperMC/Velocity) | The proxy itself — almost the whole tree | Merged into `main` |
 | `limbo-upstream` | [Nan1t/NanoLimbo](https://github.com/Nan1t/NanoLimbo) | The authentication server, at `limbo/upstream/` | `git subtree pull` |
 
+## The short version
+
+```bash
+./gradlew updateUpstreams
+```
+
+That is the whole procedure. It adds the two remotes if they are missing, merges Velocity, pulls
+the NanoLimbo subtree with the exact flags it needs, and prints the checks that come afterwards.
+It stops on anything unsafe rather than guessing, and it **never pushes** — an update nobody has
+compiled or started is not something to publish.
+
+| Task | What it does |
+| --- | --- |
+| `./gradlew addUpstreams` | Adds `upstream` and `limbo-upstream`. Idempotent; a fresh clone needs no other preparation. |
+| `./gradlew updateVelocity` | Fetches and merges `upstream/dev/4.0.0`. |
+| `./gradlew updateAuthServer` | `git subtree pull` for `limbo/upstream`. |
+| `./gradlew updateUpstreams` | Both, in order. |
+
+It refuses to start when the working tree is dirty, when a merge is already in progress, or when
+you are not on `main` — each of those either loses work or leaves a history the next update cannot
+follow. On a conflict it **leaves the merge in progress** and lists the conflicted files: aborting
+it for you would throw away a resolution you might be halfway through.
+
+The tasks live in [`gradle/upstreams.gradle.kts`](../../gradle/upstreams.gradle.kts), applied from
+the root build script in one line so that upstream-owned file stays trivial to merge.
+
+**One wrinkle.** If the conflict lands in `gradle/libs.versions.toml` — the most likely file of all
+— Gradle itself will not start again until you have resolved it, because the version catalog is
+parsed before any task runs. That costs nothing in practice: every recovery command is plain git
+anyway (`git add`, `git commit`, `git merge --abort`), and the rest of this page is what to do.
+
+The rest of this page is what those tasks do, and what to do when one of them stops.
+
+## Doing it by hand
+
 If the remotes are missing (a fresh clone only has `origin`):
 
 ```bash
