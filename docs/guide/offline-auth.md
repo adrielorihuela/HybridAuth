@@ -15,7 +15,7 @@ see [offline-auth-plan.md](../development/offline-auth-plan.md); for the authent
 
 ## Configuring it
 
-Three options in `hybridvelocity.toml`:
+Three options in `config/hybridvelocity.toml`:
 
 ```toml
 [offline-auth]

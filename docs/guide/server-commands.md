@@ -6,7 +6,7 @@ HybridVelocity can create a command for each of your servers, so that a player c
 ## Configuration
 
 The servers that get a command are listed in the `comandos` option, inside the `[servers]`
-section of `hybridvelocity.toml`:
+section of `config/hybridvelocity.toml`:
 
 ```toml
 [servers]

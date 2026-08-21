@@ -21,6 +21,10 @@ authentication server is unavailable, players are refused rather than let throug
 **Identities cannot collide.** A non-premium `Steve123` becomes `Steve123.` with a UUID derived from
 that name, so they can never be mistaken for the premium account of the same name.
 
+**Plugins that update themselves.** List a plugin's name from Hangar under `[plugins]` and the
+proxy downloads it if it is missing and updates it if there is a newer release, before it loads
+anything.
+
 **A command per server.** List a server under `comandos` and players get `/lobby` instead of
 `/server lobby`, permission-controlled per server.
 

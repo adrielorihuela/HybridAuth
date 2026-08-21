@@ -33,9 +33,15 @@ Fork-specific behaviour:
 - **Per-server shortcut commands** (`command/builtin/ServerShortcutCommand.java`, registered
   from `VelocityServer#registerServerCommands`) — the `comandos` list in `[servers]`.
   See `docs/guide/server-commands.md`.
+- **Plugin auto-update** (`plugin/update/`, `hangar` in `[plugins]`) — listed plugins are
+  downloaded and updated from Hangar in parallel, immediately before `loadPlugins()`.
+  See `docs/guide/getting-started.md`.
 
-The configuration file is `hybridvelocity.toml`; `ConfigurationLocation` renames an
-upstream-named `velocity.toml` on first start. Permission nodes keep the `velocity.` prefix —
+The configuration lives in `config/`: `ConfigurationLocation` owns that directory and moves both
+`hybridvelocity.toml` and `forwarding.secret` into it on first start, from an upstream-named
+`velocity.toml` or from the fork's own earlier layout in the proxy root. The secret is **moved and
+never regenerated** — a fresh one is accepted by the proxy and rejected by every backend on modern
+forwarding, with no error anywhere to explain it. Permission nodes keep the `velocity.` prefix —
 they are identifiers operators have already granted, not branding.
 
 Keep diffs against upstream narrow so upstream merges stay manageable.
@@ -98,8 +104,8 @@ reasoning is in `docs/development/updating-upstreams.md`.
 ./gradlew :velocity-proxy:runShadow
 ```
 
-Run the proxy locally; it generates `hybridvelocity.toml`, `forwarding.secret` and `lang/` in
-`proxy/run/`. The build produces two jars in `proxy/build/libs/`:
+Run the proxy locally; it generates `config/hybridvelocity.toml`, `config/forwarding.secret` and
+`lang/` in `proxy/run/`. The build produces two jars in `proxy/build/libs/`:
 `HybridVelocity-<forkVersion>.jar` is the runnable distributable and the one to attach to a
 release; `HybridVelocity-<forkVersion>-thin.jar` is not runnable and only feeds `shadowJar`.
 
@@ -150,6 +156,23 @@ and encryption around it.
 Because everything runs on Netty event loops, blocking work must be dispatched off-loop
 (see `VelocityScheduler`), and code touching a connection must respect its event loop.
 
+### Plugin auto-update
+
+`plugin/update/PluginUpdater` runs from `VelocityServer#start()` **immediately before
+`loadPlugins()`** and blocks until every listed plugin is on disk — after that point the loader has
+already read the directory. `reloadConfiguration()` deliberately does not repeat it: plugins are
+not reloadable, so a newer jar there would only make the files disagree with what is running.
+
+Two things are load-bearing and were established against the live API, not assumed:
+`channel=Release` must be in the query or Hangar answers with snapshots, and *up to date* is
+decided by the published SHA-256 rather than the file name, because Hangar's version string and
+the version inside the file name are different (`5.12.0-SNAPSHOT+1053` ships
+`ViaVersion-5.12.0-SNAPSHOT.jar`). The same digest verifies the download.
+
+Pruning older jars of a plugin runs on **both** paths, updated and already-current: two jars
+claiming one plugin id make the loader refuse whichever it reads second, and that was a real bug
+before it ran on the up-to-date path too.
+
 ### Wiring
 
 `VelocityServer` is the composition root: it constructs the command manager, event manager,
@@ -161,7 +184,7 @@ server shortcut commands) must be registered after the server-registration loop.
 `reloadConfiguration()` is the mirror image for `/hybridvelocity reload` and must be updated
 whenever startup gains configuration-derived state.
 
-`VelocityConfiguration` deserializes `hybridvelocity.toml` with night-config, using
+`VelocityConfiguration` deserializes `config/hybridvelocity.toml` with night-config, using
 `proxy/src/main/resources/default-velocity.toml` as the template written on first run.
 Sub-tables (`[servers]`, `[forced-hosts]`, `[advanced]`, …) map to private static inner
 classes. `validate()` is the place for cross-checks between sections, and

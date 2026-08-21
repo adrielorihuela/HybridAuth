@@ -39,14 +39,17 @@ On first start it creates:
 
 | | |
 | --- | --- |
-| `hybridvelocity.toml` | The configuration. |
-| `forwarding.secret` | The shared secret for modern player-info forwarding. |
+| `config/hybridvelocity.toml` | The configuration. |
+| `config/forwarding.secret` | The shared secret for modern player-info forwarding. |
+| `plugins/` | Plugins, including the ones listed under `[plugins]`. |
 | `lang/` | Message files. This copy wins over the ones inside the jar, so edit here to change wording. |
 | `auth/` | The authentication server's settings and the password database. |
 
-If you are upgrading from stock Velocity, put the jar in place and start it: your existing
-`velocity.toml` is renamed to `hybridvelocity.toml` with its contents intact, and the configuration
-is migrated in place.
+If you are upgrading, put the jar in place and start it. Anything from an older layout is moved
+into `config/` for you, contents intact — a stock Velocity `velocity.toml` becomes
+`config/hybridvelocity.toml`, and an existing `forwarding.secret` is **moved, never regenerated**.
+That last part matters: a new secret would be accepted silently by the proxy and rejected by every
+backend using modern forwarding.
 
 ## Configure your servers
 
@@ -79,6 +82,41 @@ Turn it off with `enabled = false` under `[offline-auth]` if you want stock Velo
 
 Read [offline-auth.md](offline-auth.md) before running this in production — especially the part
 about backing up `auth/player-passwords.db`.
+
+## Keeping plugins up to date
+
+List plugins by their name on [hangar.papermc.io](https://hangar.papermc.io) and the proxy keeps
+them current for you:
+
+```toml
+[plugins]
+hangar = ["ViaVersion", "ViaBackwards"]
+```
+
+On every start, before plugins are loaded, each one is downloaded if it is missing and updated if a
+newer build exists. They are fetched at once, and start-up waits for the last of them, so the
+loader never sees a half-finished directory.
+
+Only the **Release** channel is used. Without asking for it, Hangar answers with whatever is
+newest, which for an actively developed plugin is a snapshot — a proxy that moves itself onto
+development builds by itself is not what anyone wants.
+
+Whether a plugin is current is decided by the checksum Hangar publishes, not by the file name, and
+that same checksum verifies the download, so a truncated file never reaches `plugins/`.
+
+**If something goes wrong**, what happens depends on whether you would be left without the plugin:
+
+- The jar is already installed → a warning, and the proxy starts with the version you have. Hangar
+  being down does not take your proxy down.
+- The jar is not there at all → the proxy refuses to start, and says which plugin and why. Starting
+  without a plugin you listed on purpose is worse than not starting.
+
+**Older jars of the same plugin are deleted**, including ones you put there by hand. Two jars
+claiming the same plugin id make the loader refuse one of them, and nothing decides which. Every
+deletion is logged.
+
+A plugin not on Hangar is not affected: drop its jar in `plugins/` as usual and leave it off the
+list. An empty list makes no network requests at all.
 
 ## Backend servers
 
