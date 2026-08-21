@@ -37,9 +37,10 @@ Fork-specific behaviour:
   downloaded and updated from Hangar in parallel, immediately before `loadPlugins()`.
   See `docs/guide/getting-started.md`.
 
-The configuration lives in `config/`: `ConfigurationLocation` owns that directory and moves both
-`hybridvelocity.toml` and `forwarding.secret` into it on first start, from an upstream-named
-`velocity.toml` or from the fork's own earlier layout in the proxy root. The secret is **moved and
+The configuration is `config/proxy.toml` — named for what it configures, not for the proxy, so the
+next rename of the fork is not another migration. `ConfigurationLocation` owns that directory and
+moves any earlier name into place on first start (`hybridvelocity.toml`, upstream's
+`velocity.toml`, in `config/` or in the proxy root), along with `forwarding.secret`. The secret is **moved and
 never regenerated** — a fresh one is accepted by the proxy and rejected by every backend on modern
 forwarding, with no error anywhere to explain it. Permission nodes keep the `velocity.` prefix —
 they are identifiers operators have already granted, not branding.
@@ -104,7 +105,7 @@ reasoning is in `docs/development/updating-upstreams.md`.
 ./gradlew :velocity-proxy:runShadow
 ```
 
-Run the proxy locally; it generates `config/hybridvelocity.toml`, `config/forwarding.secret` and
+Run the proxy locally; it generates `config/proxy.toml`, `config/forwarding.secret` and
 `lang/` in `proxy/run/`. The build produces two jars in `proxy/build/libs/`:
 `HybridVelocity-<forkVersion>.jar` is the runnable distributable and the one to attach to a
 release; `HybridVelocity-<forkVersion>-thin.jar` is not runnable and only feeds `shadowJar`.
@@ -184,7 +185,7 @@ server shortcut commands) must be registered after the server-registration loop.
 `reloadConfiguration()` is the mirror image for `/hybridvelocity reload` and must be updated
 whenever startup gains configuration-derived state.
 
-`VelocityConfiguration` deserializes `config/hybridvelocity.toml` with night-config, using
+`VelocityConfiguration` deserializes `config/proxy.toml` with night-config, using
 `proxy/src/main/resources/default-velocity.toml` as the template written on first run.
 Sub-tables (`[servers]`, `[forced-hosts]`, `[advanced]`, …) map to private static inner
 classes. `validate()` is the place for cross-checks between sections, and

@@ -39,7 +39,7 @@ On first start it creates:
 
 | | |
 | --- | --- |
-| `config/hybridvelocity.toml` | The configuration. |
+| `config/proxy.toml` | The configuration. |
 | `config/forwarding.secret` | The shared secret for modern player-info forwarding. |
 | `plugins/` | Plugins, including the ones listed under `[plugins]`. |
 | `lang/` | Message files. This copy wins over the ones inside the jar, so edit here to change wording. |
@@ -47,7 +47,7 @@ On first start it creates:
 
 If you are upgrading, put the jar in place and start it. Anything from an older layout is moved
 into `config/` for you, contents intact — a stock Velocity `velocity.toml` becomes
-`config/hybridvelocity.toml`, and an existing `forwarding.secret` is **moved, never regenerated**.
+`config/proxy.toml`, and an existing `forwarding.secret` is **moved, never regenerated**.
 That last part matters: a new secret would be accepted silently by the proxy and rejected by every
 backend using modern forwarding.
 
@@ -85,38 +85,87 @@ about backing up `auth/player-passwords.db`.
 
 ## Keeping plugins up to date
 
-List plugins by their name on [hangar.papermc.io](https://hangar.papermc.io) and the proxy keeps
-them current for you:
+List the plugins you want and the proxy keeps them current for you. Four sources, and you can mix
+them freely:
 
 ```toml
 [plugins]
-hangar = ["ViaVersion", "ViaBackwards"]
+hangar = [
+    "ViaVersion"
+]
+modrinth = [
+    "ViaBackwards"
+]
+github = [
+    "ViaVersion/ViaRewind"
+]
+geyser = [
+    "geyser",
+    "floodgate"
+]
+luckperms = false
 ```
 
+| List | What goes in it |
+| --- | --- |
+| `hangar` | Project names on [hangar.papermc.io](https://hangar.papermc.io), as in the project URL. Case does not matter. |
+| `modrinth` | Project names on [modrinth.com](https://modrinth.com) — the name in the URL, which is not always the title. |
+| `github` | Repositories as `owner/repo`. The owner cannot be left out; nothing can guess it. Add `:pattern` to pick between several jars in one release. |
+| `geyser` | `geyser` and `floodgate`, from GeyserMC directly. |
+| `luckperms` | A switch, not a list: there is one LuckPerms, and on a proxy the platform is always Velocity. |
+
 On every start, before plugins are loaded, each one is downloaded if it is missing and updated if a
-newer build exists. They are fetched at once, and start-up waits for the last of them, so the
+newer build exists. They are fetched all at once and start-up waits for the last of them, so the
 loader never sees a half-finished directory.
 
-Only the **Release** channel is used. Without asking for it, Hangar answers with whatever is
-newest, which for an actively developed plugin is a snapshot — a proxy that moves itself onto
-development builds by itself is not what anyone wants.
+**Only stable builds are used.** Every one of these publishes development builds too, and left
+unfiltered they are what you get: Hangar answers ViaVersion with `5.12.0-SNAPSHOT+1053` and
+Modrinth answers ViaBackwards with a beta. A proxy that moves itself onto a snapshot on its own is
+not what anybody wants, so it does not.
 
-Whether a plugin is current is decided by the checksum Hangar publishes, not by the file name, and
-that same checksum verifies the download, so a truncated file never reaches `plugins/`.
+Whether a plugin is current is decided by the checksum its source publishes, not by the file name,
+and that same checksum verifies the download, so a truncated file never reaches `plugins/`.
+LuckPerms is the one source that publishes no checksum at all — there the file name is what there
+is, and the log says so rather than leaving it looking like something was verified.
 
-**If something goes wrong**, what happens depends on whether you would be left without the plugin:
+**Geyser and Floodgate have their own list** rather than going under `hangar`. They are listed on
+Hangar, but only as a link somewhere else: no file name, no checksum, and a version named literally
+"Geyser". There is nothing there to compare against or verify, so they are fetched from GeyserMC,
+which publishes all three.
 
-- The jar is already installed → a warning, and the proxy starts with the version you have. Hangar
-  being down does not take your proxy down.
+### If something goes wrong
+
+What happens depends on whether you would be left without the plugin:
+
+- The jar is already installed → a warning, and the proxy starts with the version you have. A
+  source being down does not take your proxy down.
 - The jar is not there at all → the proxy refuses to start, and says which plugin and why. Starting
   without a plugin you listed on purpose is worse than not starting.
 
 **Older jars of the same plugin are deleted**, including ones you put there by hand. Two jars
-claiming the same plugin id make the loader refuse one of them, and nothing decides which. Every
-deletion is logged.
+claiming the same plugin id make the loader refuse whichever it reads second, and nothing decides
+which that is. Every deletion is logged.
 
-A plugin not on Hangar is not affected: drop its jar in `plugins/` as usual and leave it off the
-list. An empty list makes no network requests at all.
+A plugin from anywhere else is unaffected: drop its jar in `plugins/` as usual and leave it off the
+lists. Empty lists make no network requests at all.
+
+### A GitHub token, if you need one
+
+GitHub allows 60 unauthenticated requests an hour from one address. That is plenty for a few
+plugins and not enough for a machine that restarts constantly. A token raises it to 5000.
+
+Put it in `config/github.token`, one line and nothing else. The file does not exist until you
+create it.
+
+```toml
+[plugins]
+github-token-file = "github.token"
+```
+
+It lives in its own file for the same reason the forwarding secret does: configurations get pasted
+into issues and screenshots, and a token in one is a credential handed to whoever reads it. A
+fine-grained token with **no permissions at all** is enough — this only reads public releases. A
+`GITHUB_TOKEN` environment variable is used instead when it is set.
 
 ## Backend servers
 
