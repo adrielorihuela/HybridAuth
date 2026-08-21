@@ -139,19 +139,31 @@ public final class PluginUpdater {
     } catch (PluginUpdateException | IOException e) {
       final List<Path> installed = existingJars(slug);
       if (installed.isEmpty()) {
-        logger.error("Could not install {}: {}", slug, e.getMessage());
+        logger.error("Could not install {}: {}", slug, sentence(e.getMessage()));
         return slug + " (" + e.getMessage() + ")";
       }
-      logger.warn("Could not check {} for updates: {}. Continuing with the installed {}.",
-          slug, e.getMessage(), installed.get(0).getFileName());
+      logger.warn("Could not check {} for updates: {} Continuing with the installed {}.",
+          slug, sentence(e.getMessage()), installed.get(0).getFileName());
       return null;
     }
+  }
+
+  /** Ends a reason with a full stop, since some of them already carry one and some do not. */
+  private static String sentence(final String message) {
+    if (message == null || message.isEmpty()) {
+      return "no reason given.";
+    }
+    return message.endsWith(".") ? message : message + ".";
   }
 
   private void install(final String slug, final HangarRelease release)
       throws PluginUpdateException, IOException {
     final Path target = pluginDirectory.resolve(release.fileName());
     if (Files.exists(target) && release.sha256().equalsIgnoreCase(sha256Of(target))) {
+      // Still prune: an older jar dropped in by hand is not made harmless by us being up to date.
+      // The plugin loader refuses the second one it sees for an id, and which of the two it reads
+      // first is not something anybody controls.
+      pruneOtherJars(release.baseName(), target);
       logger.info("{} {} is up to date.", slug, release.version());
       return;
     }
@@ -167,14 +179,8 @@ public final class PluginUpdater {
             + "published for it, so it has been discarded");
       }
 
-      // Only once the replacement is known good: two versions of the same plugin in plugins/ is a
-      // duplicate plugin id and a refusal to load, which is worse than being out of date.
-      for (final Path old : existingJars(release.baseName())) {
-        if (!old.equals(target)) {
-          Files.deleteIfExists(old);
-          logger.info("Removed the previous {}", old.getFileName());
-        }
-      }
+      // Only once the replacement is known good.
+      pruneOtherJars(release.baseName(), target);
       Files.move(part, target, StandardCopyOption.REPLACE_EXISTING);
       logger.info("{} {} installed.", slug, release.version());
     } finally {
@@ -201,6 +207,23 @@ public final class PluginUpdater {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new PluginUpdateException("interrupted while downloading it", e);
+    }
+  }
+
+  /**
+   * Deletes every other jar of this plugin, so only {@code keep} is left for the loader to find.
+   *
+   * <p>Two jars claiming one plugin id make the loader refuse the second one it happens to read,
+   * and nothing decides which that is. Being out of date is recoverable; loading the wrong copy
+   * silently is not.</p>
+   */
+  private void pruneOtherJars(final String baseName, final Path keep) throws IOException {
+    for (final Path old : existingJars(baseName)) {
+      if (!old.equals(keep)) {
+        Files.deleteIfExists(old);
+        logger.info("Removed {}, which claims the same plugin as {}",
+            old.getFileName(), keep.getFileName());
+      }
     }
   }
 
