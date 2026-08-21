@@ -95,6 +95,23 @@ server-name = "auth"
 # Set 0 to let the system pick a free port on each start.
 server-port = 30065
 
+# Plugins the proxy keeps up to date by itself.
+[plugins]
+# Names of plugins on hangar.papermc.io, exactly as they appear in the project's URL.
+# Capitalisation does not matter. On every start, before plugins are loaded, each one is
+# downloaded if it is missing and updated if a newer Release build exists. Only the Release
+# channel is used, never snapshots.
+#
+# If a plugin cannot be downloaded and no jar of it is installed, the proxy refuses to start
+# rather than run without a plugin you asked for. If a jar is already there, it warns and keeps
+# using the version you have, so a Hangar outage cannot take the proxy down.
+#
+# Older jars of the same plugin are deleted when a new one is installed, including any you put
+# there by hand: two versions of one plugin in plugins/ is a duplicate id and a refusal to load.
+#
+# An empty list makes no network requests at all.
+hangar = []
+
 [packet-limiter]
 # Size of the moving time window in seconds used to calculate average rates.
 # A larger window tolerates short bursts while still enforcing the configured limits over time.

@@ -51,7 +51,7 @@ class ConfigurationLocationTest {
   }
 
   @Test
-  void aForkConfigurationLeftInTheRootIsMovedIn() throws IOException {
+  void forkConfigurationLeftInTheRootIsMovedIn() throws IOException {
     Files.writeString(dir.resolve("hybridvelocity.toml"), "motd = \"mine\"");
 
     final Path resolved = ConfigurationLocation.resolve(dir);
@@ -70,7 +70,7 @@ class ConfigurationLocationTest {
   }
 
   @Test
-  void anAlreadyMigratedInstallationIsLeftAlone() throws IOException {
+  void alreadyMigratedInstallationIsLeftAlone() throws IOException {
     final Path existing = dir.resolve("config").resolve("hybridvelocity.toml");
     Files.createDirectories(existing.getParent());
     Files.writeString(existing, "motd = \"current\"");
@@ -95,7 +95,7 @@ class ConfigurationLocationTest {
   }
 
   @Test
-  void anExistingSecretInConfigIsUsedAsIs() throws IOException {
+  void existingSecretInConfigIsUsedAsIs() throws IOException {
     final Path existing = dir.resolve("config").resolve("forwarding.secret");
     Files.createDirectories(existing.getParent());
     Files.writeString(existing, "current");
@@ -106,13 +106,13 @@ class ConfigurationLocationTest {
   }
 
   @Test
-  void aRelativeSettingIsResolvedInsideConfig() {
+  void relativeSettingIsResolvedInsideConfig() {
     assertEquals(dir.resolve("config").resolve("secrets").resolve("mine.txt"),
         ConfigurationLocation.resolveForwardingSecret(dir, "secrets/mine.txt"));
   }
 
   @Test
-  void anAbsoluteSettingIsHonouredUntouched() {
+  void absoluteSettingIsHonouredUntouched() {
     // Somebody who pointed this at a specific place meant it - a mounted secret, say.
     final Path absolute = dir.resolve("elsewhere").resolve("forwarding.secret").toAbsolutePath();
 

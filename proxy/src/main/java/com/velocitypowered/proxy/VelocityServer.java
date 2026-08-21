@@ -64,6 +64,8 @@ import com.velocitypowered.proxy.network.ConnectionManager;
 import com.velocitypowered.proxy.plugin.VelocityPluginManager;
 import com.velocitypowered.proxy.plugin.loader.VelocityPluginContainer;
 import com.velocitypowered.proxy.plugin.loader.VelocityPluginDescription;
+import com.velocitypowered.proxy.plugin.update.PluginUpdateException;
+import com.velocitypowered.proxy.plugin.update.PluginUpdater;
 import com.velocitypowered.proxy.plugin.virtual.VelocityVirtualPlugin;
 import com.velocitypowered.proxy.protocol.ProtocolUtils;
 import com.velocitypowered.proxy.protocol.util.FaviconSerializer;
@@ -329,6 +331,11 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
     ipAttemptLimiter = Ratelimiters.createWithMilliseconds(configuration.getLoginRatelimit());
     commandRateLimiter = Ratelimiters.createWithMilliseconds(configuration.getCommandRatelimit());
     tabCompleteRateLimiter = Ratelimiters.createWithMilliseconds(configuration.getTabCompleteRatelimit());
+
+    // Before loadPlugins(), never after: by the time the loader reads plugins/, everything listed
+    // in [plugins] has to be on disk, or it silently starts without it.
+    updateConfiguredPlugins();
+
     loadPlugins();
 
     // Go ahead and fire the proxy initialization event. We block since plugins should have a chance
@@ -611,6 +618,29 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
     } catch (Exception e) {
       logger.error("Unable to read/load/save your {}. The server will shut down.",
           ConfigurationLocation.FILE_NAME, e);
+      LogManager.shutdown();
+      System.exit(1);
+    }
+  }
+
+  /**
+   * Downloads and updates the plugins listed in the configuration, and waits for all of them.
+   *
+   * <p>Deliberately not repeated by {@link #reloadConfiguration()}: plugins are not reloadable, so
+   * downloading a newer jar there would only make the files on disk disagree with what is running
+   * until the next restart.</p>
+   */
+  @SuppressFBWarnings("DM_EXIT")
+  private void updateConfiguredPlugins() {
+    final PluginUpdater updater = new PluginUpdater(createHttpClient(), Path.of("plugins"));
+    try {
+      updater.updateAll(configuration.getPluginsConfig().hangar());
+    } catch (PluginUpdateException e) {
+      // Only reached when a listed plugin is not on disk at all. Starting anyway means running
+      // without a plugin somebody listed on purpose, and finding out later from the symptoms.
+      logger.error("Could not install every plugin listed in [plugins]: {}", e.getMessage());
+      logger.error("HybridVelocity will not start without them. Remove the plugin from the list "
+          + "if you no longer want it, or install its jar in plugins/ yourself.");
       LogManager.shutdown();
       System.exit(1);
     }

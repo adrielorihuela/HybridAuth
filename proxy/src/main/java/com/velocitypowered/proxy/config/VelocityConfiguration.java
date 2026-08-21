@@ -100,6 +100,8 @@ public class VelocityConfiguration implements ProxyConfig {
   private PacketLimiterConfig packetLimiterConfig = PacketLimiterConfig.DEFAULT;
   @Expose
   private OfflineAuthConfig offlineAuthConfig = OfflineAuthConfig.DEFAULT;
+  @Expose
+  private PluginsConfig pluginsConfig = PluginsConfig.DEFAULT;
 
   private VelocityConfiguration(Servers servers, ForcedHosts forcedHosts, Advanced advanced,
       Query query, Metrics metrics) {
@@ -117,7 +119,7 @@ public class VelocityConfiguration implements ProxyConfig {
       boolean samplePlayersInPing, boolean enablePlayerAddressLogging, Servers servers,
       ForcedHosts forcedHosts, Advanced advanced, Query query, Metrics metrics,
       boolean forceKeyAuthentication, PacketLimiterConfig packetLimiterConfig,
-      OfflineAuthConfig offlineAuthConfig) {
+      OfflineAuthConfig offlineAuthConfig, PluginsConfig pluginsConfig) {
     this.bind = bind;
     this.motd = motd;
     this.showMaxPlayers = showMaxPlayers;
@@ -138,6 +140,7 @@ public class VelocityConfiguration implements ProxyConfig {
     this.forceKeyAuthentication = forceKeyAuthentication;
     this.packetLimiterConfig = packetLimiterConfig;
     this.offlineAuthConfig = offlineAuthConfig;
+    this.pluginsConfig = pluginsConfig;
   }
 
   /**
@@ -383,6 +386,15 @@ public class VelocityConfiguration implements ProxyConfig {
     return offlineAuthConfig;
   }
 
+  /**
+   * Returns the plugins the proxy keeps up to date, from the {@code [plugins]} section.
+   *
+   * @return the plugin update configuration
+   */
+  public PluginsConfig getPluginsConfig() {
+    return pluginsConfig;
+  }
+
   @Override
   public Map<String, List<String>> getForcedHosts() {
     return forcedHosts.getForcedHosts();
@@ -535,6 +547,7 @@ public class VelocityConfiguration implements ProxyConfig {
         .add("forceKeyAuthentication", forceKeyAuthentication)
         .add("packetLimiterConfig", packetLimiterConfig)
         .add("offlineAuthConfig", offlineAuthConfig)
+        .add("pluginsConfig", pluginsConfig)
         .toString();
   }
 
@@ -628,6 +641,7 @@ public class VelocityConfiguration implements ProxyConfig {
       final CommentedConfig metricsConfig = config.get("metrics");
       final OfflineAuthConfig offlineAuthConfig =
               OfflineAuthConfig.fromConfig(config.get("offline-auth"));
+      final PluginsConfig pluginsConfig = PluginsConfig.fromConfig(config.get("plugins"));
       final PlayerInfoForwarding forwardingMode = config.getEnumOrElse(
               "player-info-forwarding-mode", PlayerInfoForwarding.NONE);
       final PingPassthroughMode pingPassthroughMode = config.getEnumOrElse("ping-passthrough",
@@ -675,7 +689,8 @@ public class VelocityConfiguration implements ProxyConfig {
               new Metrics(metricsConfig),
               forceKeyAuthentication,
               packetLimiterConfig,
-              offlineAuthConfig
+              offlineAuthConfig,
+              pluginsConfig
       );
     }
   }
@@ -1091,6 +1106,35 @@ public class VelocityConfiguration implements ProxyConfig {
 
     public boolean isEnabled() {
       return enabled;
+    }
+  }
+
+  /**
+   * Plugins the proxy keeps up to date for itself.
+   *
+   * @param hangar plugin names on hangar.papermc.io
+   */
+  public record PluginsConfig(List<String> hangar) {
+
+    public static final PluginsConfig DEFAULT = new PluginsConfig(List.of());
+
+    /**
+     * Returns a PluginsConfig from a config section, or the default if the section is null.
+     *
+     * @param config the configuration section to parse
+     * @return the plugins config, or the default if {@code config} is null
+     */
+    public static PluginsConfig fromConfig(CommentedConfig config) {
+      if (config == null) {
+        return DEFAULT;
+      }
+      final List<String> hangar = config.getOrElse("hangar", List.<String>of());
+      // Blank entries are what a half-edited list looks like, and asking Hangar about "" only
+      // produces a confusing error later.
+      return new PluginsConfig(hangar.stream()
+          .map(String::trim)
+          .filter(name -> !name.isEmpty())
+          .toList());
     }
   }
 

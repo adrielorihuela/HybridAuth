@@ -75,16 +75,6 @@ public final class ConfigurationLocation {
   }
 
   /**
-   * Returns the path of the forwarding secret file, relative to the working directory.
-   *
-   * @param configured the {@code forwarding-secret-file} setting, or {@code null} if unset
-   * @return the path the secret should be read from and written to
-   */
-  public static Path resolveForwardingSecret(final String configured) {
-    return resolveForwardingSecret(workingDirectory(), configured);
-  }
-
-  /**
    * Returns the path to the configuration, moving an older one into place if one is found.
    *
    * @param baseDir the directory the proxy is running in
@@ -114,6 +104,16 @@ public final class ConfigurationLocation {
     }
 
     return path;
+  }
+
+  /**
+   * Returns the path of the forwarding secret file, relative to the working directory.
+   *
+   * @param configured the {@code forwarding-secret-file} setting, or {@code null} if unset
+   * @return the path the secret should be read from and written to
+   */
+  public static Path resolveForwardingSecret(final String configured) {
+    return resolveForwardingSecret(workingDirectory(), configured);
   }
 
   /**
