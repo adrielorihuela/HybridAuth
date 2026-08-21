@@ -1,8 +1,18 @@
 # HybridVelocity
 
-A fork of [Velocity](https://github.com/PaperMC/Velocity) that lets one online-mode proxy serve
-premium and non-premium players together, with password authentication built in — no extra plugin,
-no extra server.
+**Run one Minecraft server for cracked and premium players at the same time.** A fork of
+[Velocity](https://github.com/PaperMC/Velocity) with `/register` and `/login` built into the proxy
+— no AuthMe, no separate login server, no plugin to install and configure.
+
+Java and Bedrock, premium and non-premium, on one address. Works with Geyser, Floodgate,
+ViaVersion and every Velocity plugin you already run.
+
+- **Cracked players welcome, and authenticated.** Anyone Mojang cannot verify gets a password
+  account instead of a disconnect.
+- **Premium players untouched.** No prompt, no password, exactly as before.
+- **Bedrock players untouched.** Geyser and Floodgate have already verified them.
+- **No name stealing.** A non-premium `Steve` can never be mistaken for the premium account.
+- **Plugins that update themselves**, from Hangar, Modrinth, GitHub, GeyserMC and LuckPerms.
 
 Licensed under the GPLv3, like Velocity.
 
