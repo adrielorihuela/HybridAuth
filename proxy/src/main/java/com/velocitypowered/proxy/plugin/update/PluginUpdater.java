@@ -83,9 +83,10 @@ public final class PluginUpdater {
    * Creates an updater.
    *
    * @param pluginDirectory the directory plugins are loaded from
+   * @param githubToken a GitHub token to raise its rate limit with, or {@code null} for none
    */
-  public PluginUpdater(final Path pluginDirectory) {
-    this(defaultHttpClient(), pluginDirectory);
+  public PluginUpdater(final Path pluginDirectory, final @Nullable String githubToken) {
+    this(defaultHttpClient(), pluginDirectory, githubToken);
   }
 
   /**
@@ -104,13 +105,14 @@ public final class PluginUpdater {
         .build();
   }
 
-  PluginUpdater(final HttpClient httpClient, final Path pluginDirectory) {
+  PluginUpdater(final HttpClient httpClient, final Path pluginDirectory,
+      final @Nullable String githubToken) {
     this.httpClient = httpClient;
     this.pluginDirectory = pluginDirectory;
     this.sources = Map.of(
         "hangar", new HangarSource(httpClient),
         "modrinth", new ModrinthSource(httpClient),
-        "github", new GitHubSource(httpClient),
+        "github", new GitHubSource(httpClient, githubToken),
         "geyser", new GeyserSource(httpClient),
         "luckperms", new LuckPermsSource(httpClient));
   }

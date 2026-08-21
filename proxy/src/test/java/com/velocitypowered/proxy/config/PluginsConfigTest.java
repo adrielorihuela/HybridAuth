@@ -61,6 +61,20 @@ class PluginsConfigTest {
   }
 
   @Test
+  void githubTokenFileHasDefaultNameButIsNotCreated() {
+    // The setting always has a value; whether a token is used depends on the file existing.
+    assertEquals("github.token", PluginsConfig.DEFAULT.githubTokenFile());
+  }
+
+  @Test
+  void githubTokenFileCanBeMoved() {
+    final CommentedConfig config = CommentedConfig.inMemory();
+    config.set("github-token-file", "secrets/gh.txt");
+
+    assertEquals("secrets/gh.txt", PluginsConfig.fromConfig(config).githubTokenFile());
+  }
+
+  @Test
   void luckpermsIsOffUnlessAskedFor() {
     final CommentedConfig config = CommentedConfig.inMemory();
     config.set("luckperms", false);

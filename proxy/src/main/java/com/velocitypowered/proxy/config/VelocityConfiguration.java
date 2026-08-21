@@ -1118,12 +1118,16 @@ public class VelocityConfiguration implements ProxyConfig {
    * @param github GitHub repositories, as {@code owner/repo} or {@code owner/repo:regex}
    * @param geyser GeyserMC projects, which are {@code geyser} and {@code floodgate}
    * @param luckperms whether to keep LuckPerms up to date
+   * @param githubTokenFile the file holding a GitHub token, relative to the config directory
    */
   public record PluginsConfig(List<String> hangar, List<String> modrinth, List<String> github,
-      List<String> geyser, boolean luckperms) {
+      List<String> geyser, boolean luckperms, String githubTokenFile) {
+
+    /** The default name of the file holding a GitHub token. It is not created for you. */
+    public static final String GITHUB_TOKEN_FILE = "github.token";
 
     public static final PluginsConfig DEFAULT =
-        new PluginsConfig(List.of(), List.of(), List.of(), List.of(), false);
+        new PluginsConfig(List.of(), List.of(), List.of(), List.of(), false, GITHUB_TOKEN_FILE);
 
     /**
      * Returns a PluginsConfig from a config section, or the default if the section is null.
@@ -1140,7 +1144,8 @@ public class VelocityConfiguration implements ProxyConfig {
           names(config, "modrinth"),
           names(config, "github"),
           names(config, "geyser"),
-          config.getOrElse("luckperms", false));
+          config.getOrElse("luckperms", false),
+          config.getOrElse("github-token-file", GITHUB_TOKEN_FILE));
     }
 
     /**

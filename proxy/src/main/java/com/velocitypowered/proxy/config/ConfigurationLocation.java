@@ -155,6 +155,32 @@ public final class ConfigurationLocation {
     return path;
   }
 
+  /**
+   * Resolves a file named by a setting, relative to {@link #DIRECTORY}.
+   *
+   * <p>Same rule as the forwarding secret, minus the migration: an absolute setting is used as
+   * given, a relative one lives in {@code config/}. Nothing is created — a file that is not there
+   * means the setting is unused.</p>
+   *
+   * @param baseDir the directory the proxy is running in
+   * @param configured the setting
+   * @return where to look for it
+   */
+  public static Path resolveConfigFile(final Path baseDir, final String configured) {
+    final Path asGiven = Path.of(configured);
+    return asGiven.isAbsolute() ? asGiven : baseDir.resolve(DIRECTORY).resolve(asGiven);
+  }
+
+  /**
+   * Resolves a file named by a setting, relative to the working directory.
+   *
+   * @param configured the setting
+   * @return where to look for it
+   */
+  public static Path resolveConfigFile(final String configured) {
+    return resolveConfigFile(workingDirectory(), configured);
+  }
+
   /** Moves a file, creating the destination directory. Returns whether it worked. */
   private static boolean move(final Path from, final Path to) {
     try {

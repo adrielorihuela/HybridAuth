@@ -35,9 +35,13 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * jars. The owner cannot be left out: nothing in the API can guess it.</p>
  *
  * <p>GitHub allows sixty unauthenticated requests an hour per address, which is plenty for a few
- * plugins at start-up but not for a machine that restarts constantly. A {@code GITHUB_TOKEN}
- * environment variable is used when it is set. It is read from the environment and not from the
- * configuration on purpose: a token in a config file is a secret sitting in plain text.</p>
+ * plugins at start-up but not for a machine that restarts constantly. A token raises that to five
+ * thousand. It comes from the file named by {@code github-token-file}, or from a
+ * {@code GITHUB_TOKEN} environment variable, which wins when both are set.</p>
+ *
+ * <p>The token is kept in a file of its own rather than in the configuration, the same way the
+ * forwarding secret is: configurations get pasted into issues and screenshots, and a token in one
+ * is a credential handed to whoever reads it.</p>
  */
 final class GitHubSource implements PluginSource {
 
@@ -50,13 +54,12 @@ final class GitHubSource implements PluginSource {
   private final JsonApi api;
   private final @Nullable String token;
 
-  GitHubSource(final HttpClient httpClient) {
-    this(httpClient, System.getenv("GITHUB_TOKEN"));
-  }
-
   GitHubSource(final HttpClient httpClient, final @Nullable String token) {
     this.api = new JsonApi(httpClient);
-    this.token = token == null || token.isBlank() ? null : token;
+    final String fromEnvironment = System.getenv("GITHUB_TOKEN");
+    final String chosen = fromEnvironment != null && !fromEnvironment.isBlank()
+        ? fromEnvironment : token;
+    this.token = chosen == null || chosen.isBlank() ? null : chosen.trim();
   }
 
   @Override

@@ -632,9 +632,11 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
    */
   @SuppressFBWarnings("DM_EXIT")
   private void updateConfiguredPlugins() {
-    final PluginUpdater updater = new PluginUpdater(Path.of("plugins"));
+    final VelocityConfiguration.PluginsConfig plugins = configuration.getPluginsConfig();
+    final PluginUpdater updater =
+        new PluginUpdater(Path.of("plugins"), readGitHubToken(plugins.githubTokenFile()));
     try {
-      updater.updateAll(configuration.getPluginsConfig().wanted());
+      updater.updateAll(plugins.wanted());
     } catch (PluginUpdateException e) {
       // Only reached when a listed plugin is not on disk at all. Starting anyway means running
       // without a plugin somebody listed on purpose, and finding out later from the symptoms.
@@ -643,6 +645,37 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
           + "if you no longer want it, or install its jar in plugins/ yourself.");
       LogManager.shutdown();
       System.exit(1);
+    }
+  }
+
+  /**
+   * Reads the GitHub token, if there is a file holding one.
+   *
+   * <p>Absent is the normal case and says nothing: sixty requests an hour is enough for a handful
+   * of plugins. Only its presence is ever logged, never any part of the token itself.</p>
+   *
+   * @param configured the {@code github-token-file} setting
+   * @return the token, or {@code null} if there is no file or it is empty
+   */
+  private @Nullable String readGitHubToken(final String configured) {
+    if (configured == null || configured.isBlank()) {
+      return null;
+    }
+    final Path path = ConfigurationLocation.resolveConfigFile(configured);
+    if (!Files.isRegularFile(path)) {
+      return null;
+    }
+    try {
+      final String token = Files.readString(path).trim();
+      if (token.isEmpty()) {
+        logger.warn("{} is empty; GitHub will be used without a token.", configured);
+        return null;
+      }
+      logger.info("Using the GitHub token from {}.", configured);
+      return token;
+    } catch (IOException e) {
+      logger.warn("Could not read {}; GitHub will be used without a token.", configured, e);
+      return null;
     }
   }
 
