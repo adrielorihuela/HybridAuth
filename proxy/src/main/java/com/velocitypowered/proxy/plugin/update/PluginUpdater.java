@@ -33,28 +33,32 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Stream;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
- * Downloads and updates the plugins listed under {@code [plugins] hangar} before they are loaded.
+ * Downloads and updates the plugins listed under {@code [plugins]} before they are loaded.
  *
  * <p>Runs once, at start-up, immediately before {@code loadPlugins()}: by the time the plugin
  * loader reads {@code plugins/}, every jar it is meant to find is there. All of them are fetched
  * at once and the start-up waits for the last one.</p>
  *
- * <p>Whether a plugin is up to date is decided by the SHA-256 Hangar publishes, not by the file
- * name. Names are ambiguous — Hangar's build {@code 5.12.0-SNAPSHOT+1053} ships a file called
+ * <p>Whether a plugin is up to date is decided by the checksum its source publishes, not by the
+ * file name. Names are ambiguous — Hangar's build {@code 5.12.0-SNAPSHOT+1053} ships a file called
  * {@code ViaVersion-5.12.0-SNAPSHOT.jar} — and the same digest verifies the download afterwards,
- * so a truncated or corrupted file is never put in place.</p>
+ * so a truncated or corrupted file is never put in place. LuckPerms publishes no checksum at all,
+ * and there the file name is what there is; that is said out loud in the log rather than left to
+ * look like a verification that happened.</p>
  *
  * <p>A failure is only fatal when it would leave the proxy without a plugin: if the jar is already
- * on disk, a Hangar outage is a warning and the installed version is used. If it is not, start-up
- * stops, because carrying on means running without a plugin somebody listed on purpose.</p>
+ * on disk, an outage is a warning and the installed version is used. If it is not, start-up stops,
+ * because carrying on means running without a plugin somebody listed on purpose.</p>
  */
 public final class PluginUpdater {
 
@@ -62,34 +66,67 @@ public final class PluginUpdater {
 
   private static final Duration DOWNLOAD_TIMEOUT = Duration.ofMinutes(5);
 
+  /**
+   * One line of the configuration: which source, and what to ask it for.
+   *
+   * @param source the name of the source, as written in the configuration
+   * @param spec the plugin identifier within it
+   */
+  public record Wanted(String source, String spec) {
+  }
+
   private final HttpClient httpClient;
-  private final HangarClient hangar;
   private final Path pluginDirectory;
+  private final Map<String, PluginSource> sources;
 
   /**
    * Creates an updater.
    *
-   * @param httpClient the proxy's HTTP client
    * @param pluginDirectory the directory plugins are loaded from
    */
-  public PluginUpdater(final HttpClient httpClient, final Path pluginDirectory) {
+  public PluginUpdater(final Path pluginDirectory) {
+    this(defaultHttpClient(), pluginDirectory);
+  }
+
+  /**
+   * A client of its own, rather than the proxy's.
+   *
+   * <p>Every one of these APIs redirects: GeyserMC answers {@code builds/latest} with a 302 to the
+   * real build, and GitHub's download links point at another host entirely. The proxy's client is
+   * built with the default {@code NEVER} policy, and it is shared with Mojang session
+   * authentication, which is not somewhere to go changing redirect behaviour for the convenience
+   * of downloading plugins.</p>
+   */
+  private static HttpClient defaultHttpClient() {
+    return HttpClient.newBuilder()
+        .followRedirects(HttpClient.Redirect.NORMAL)
+        .connectTimeout(Duration.ofSeconds(20))
+        .build();
+  }
+
+  PluginUpdater(final HttpClient httpClient, final Path pluginDirectory) {
     this.httpClient = httpClient;
-    this.hangar = new HangarClient(httpClient);
     this.pluginDirectory = pluginDirectory;
+    this.sources = Map.of(
+        "hangar", new HangarSource(httpClient),
+        "modrinth", new ModrinthSource(httpClient),
+        "github", new GitHubSource(httpClient),
+        "geyser", new GeyserSource(httpClient),
+        "luckperms", new LuckPermsSource(httpClient));
   }
 
   /**
    * Brings every listed plugin up to date, and blocks until they all are.
    *
-   * @param slugs the plugin names from the configuration
+   * @param wanted what the configuration asks for
    * @throws PluginUpdateException if a plugin is missing and could not be downloaded
    */
-  public void updateAll(final List<String> slugs) throws PluginUpdateException {
-    if (slugs.isEmpty()) {
+  public void updateAll(final List<Wanted> wanted) throws PluginUpdateException {
+    if (wanted.isEmpty()) {
       return;
     }
 
-    logger.info("Checking {} plugin(s) for updates...", slugs.size());
+    logger.info("Checking {} plugin(s) for updates...", wanted.size());
     try {
       Files.createDirectories(pluginDirectory);
     } catch (IOException e) {
@@ -99,16 +136,16 @@ public final class PluginUpdater {
     // One thread per plugin, capped: this is network-bound and short-lived, and holding up
     // start-up any longer than the slowest download would be the whole point missed.
     final ExecutorService pool =
-        Executors.newFixedThreadPool(Math.min(slugs.size(), 8), runnable -> {
+        Executors.newFixedThreadPool(Math.min(wanted.size(), 8), runnable -> {
           final Thread thread = new Thread(runnable, "Plugin Updater");
           thread.setDaemon(true);
           return thread;
         });
 
-    final List<CompletableFuture<String>> futures = new ArrayList<>(slugs.size());
+    final List<CompletableFuture<String>> futures = new ArrayList<>(wanted.size());
     try {
-      for (final String slug : slugs) {
-        futures.add(CompletableFuture.supplyAsync(() -> updateOne(slug), pool));
+      for (final Wanted one : wanted) {
+        futures.add(CompletableFuture.supplyAsync(() -> updateOne(one), pool));
       }
       // join() rather than a timeout: every request already has its own, so this cannot hang
       // longer than the slowest of them.
@@ -131,61 +168,105 @@ public final class PluginUpdater {
   }
 
   /** Returns null when the plugin ended up usable, or a message when start-up must stop. */
-  private String updateOne(final String slug) {
+  private String updateOne(final Wanted wanted) {
+    final String label = wanted.spec();
     try {
-      final HangarRelease release = hangar.latestRelease(slug);
-      install(slug, release);
+      final PluginSource source = sources.get(wanted.source());
+      if (source == null) {
+        throw new PluginUpdateException("there is no plugin source called " + wanted.source()
+            + ". The ones there are: " + String.join(", ", sources.keySet().stream().sorted()
+            .toList()) + ".");
+      }
+      install(label, source.resolve(wanted.spec()));
       return null;
     } catch (PluginUpdateException | IOException e) {
-      final List<Path> installed = existingJars(slug);
+      final List<Path> installed = existingJars(lastSegment(label));
       if (installed.isEmpty()) {
-        logger.error("Could not install {}: {}", slug, sentence(e.getMessage()));
-        return slug + " (" + e.getMessage() + ")";
+        logger.error("Could not install {}: {}", label, sentence(e.getMessage()));
+        return label + " (" + e.getMessage() + ")";
       }
       logger.warn("Could not check {} for updates: {} Continuing with the installed {}.",
-          slug, sentence(e.getMessage()), installed.get(0).getFileName());
+          label, sentence(e.getMessage()), installed.get(0).getFileName());
       return null;
     }
   }
 
   /** Ends a reason with a full stop, since some of them already carry one and some do not. */
-  private static String sentence(final String message) {
+  private static String sentence(final @Nullable String message) {
     if (message == null || message.isEmpty()) {
       return "no reason given.";
     }
     return message.endsWith(".") ? message : message + ".";
   }
 
-  private void install(final String slug, final HangarRelease release)
+  /**
+   * The part of an entry that could name a jar on disk.
+   *
+   * <p>For {@code ViaVersion/ViaRewind} that is {@code ViaRewind}; for everything else it is the
+   * entry itself. Only used to guess whether something is already installed when the source could
+   * not be reached, so a near miss costs a warning rather than a wrong decision.</p>
+   *
+   * @param spec the configuration entry
+   * @return the part that might match a file name
+   */
+  static String lastSegment(final String spec) {
+    final int slash = spec.lastIndexOf('/');
+    final String withoutOwner = slash == -1 ? spec : spec.substring(slash + 1);
+    final int colon = withoutOwner.indexOf(':');
+    return colon == -1 ? withoutOwner : withoutOwner.substring(0, colon);
+  }
+
+  private void install(final String label, final PluginRelease release)
       throws PluginUpdateException, IOException {
     final Path target = pluginDirectory.resolve(release.fileName());
-    if (Files.exists(target) && release.sha256().equalsIgnoreCase(sha256Of(target))) {
+    if (Files.exists(target) && isCurrent(target, release)) {
       // Still prune: an older jar dropped in by hand is not made harmless by us being up to date.
       // The plugin loader refuses the second one it sees for an id, and which of the two it reads
       // first is not something anybody controls.
       pruneOtherJars(release.baseName(), target);
-      logger.info("{} {} is up to date.", slug, release.version());
+      logger.info("{} {} is up to date.", label, release.version());
       return;
     }
 
-    logger.info("Updating {} to {}...", slug, release.version());
+    logger.info("Updating {} to {} from {}...", label, release.version(), release.source());
     final Path part = pluginDirectory.resolve(release.fileName() + ".part");
     try {
       download(release.downloadUrl(), part);
 
-      final String actual = sha256Of(part);
-      if (!release.sha256().equalsIgnoreCase(actual)) {
-        throw new PluginUpdateException("the downloaded file did not match the checksum Hangar "
-            + "published for it, so it has been discarded");
+      final PluginRelease.Checksum checksum = release.checksum();
+      if (checksum != null) {
+        final String actual = digestOf(part, checksum.algorithm());
+        if (!checksum.hex().equalsIgnoreCase(actual)) {
+          throw new PluginUpdateException("the downloaded file did not match the checksum "
+              + release.source() + " published for it, so it has been discarded");
+        }
+      } else {
+        logger.info("{} publishes no checksum, so {} could not be verified.",
+            release.source(), release.fileName());
       }
 
       // Only once the replacement is known good.
       pruneOtherJars(release.baseName(), target);
       Files.move(part, target, StandardCopyOption.REPLACE_EXISTING);
-      logger.info("{} {} installed.", slug, release.version());
+      logger.info("{} {} installed.", label, release.version());
     } finally {
       Files.deleteIfExists(part);
     }
+  }
+
+  /**
+   * Whether the file already on disk is the release the source is offering.
+   *
+   * <p>With a checksum this is exact. Without one — LuckPerms publishes none — the answer is that
+   * a file of that name is there, which is weaker but not meaningless: the version is part of the
+   * name, so a newer release asks for a different file.</p>
+   */
+  private boolean isCurrent(final Path target, final PluginRelease release) throws IOException {
+    final PluginRelease.Checksum checksum = release.checksum();
+    if (checksum == null) {
+      return true;
+    }
+    return checksum.hex().equalsIgnoreCase(digestOf(target, checksum.algorithm()));
   }
 
   private void download(final String url, final Path destination)
@@ -213,8 +294,8 @@ public final class PluginUpdater {
   /**
    * Deletes every other jar of this plugin, so only {@code keep} is left for the loader to find.
    *
-   * <p>Two jars claiming one plugin id make the loader refuse the second one it happens to read,
-   * and nothing decides which that is. Being out of date is recoverable; loading the wrong copy
+   * <p>Two jars claiming one plugin id make the loader refuse whichever it reads second, and
+   * nothing decides which that is. Being out of date is recoverable; loading the wrong copy
    * silently is not.</p>
    */
   private void pruneOtherJars(final String baseName, final Path keep) throws IOException {
@@ -260,12 +341,12 @@ public final class PluginUpdater {
     return stem.equals(prefix) || stem.startsWith(prefix + "-");
   }
 
-  private static String sha256Of(final Path path) throws IOException {
+  private static String digestOf(final Path path, final String algorithm) throws IOException {
     final MessageDigest digest;
     try {
-      digest = MessageDigest.getInstance("SHA-256");
+      digest = MessageDigest.getInstance(algorithm);
     } catch (NoSuchAlgorithmException e) {
-      throw new AssertionError("SHA-256 is required of every JVM", e);
+      throw new IOException("this JVM has no " + algorithm + " implementation", e);
     }
     try (InputStream in = Files.newInputStream(path)) {
       final byte[] buffer = new byte[8192];

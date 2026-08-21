@@ -632,9 +632,9 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
    */
   @SuppressFBWarnings("DM_EXIT")
   private void updateConfiguredPlugins() {
-    final PluginUpdater updater = new PluginUpdater(createHttpClient(), Path.of("plugins"));
+    final PluginUpdater updater = new PluginUpdater(Path.of("plugins"));
     try {
-      updater.updateAll(configuration.getPluginsConfig().hangar());
+      updater.updateAll(configuration.getPluginsConfig().wanted());
     } catch (PluginUpdateException e) {
       // Only reached when a listed plugin is not on disk at all. Starting anyway means running
       // without a plugin somebody listed on purpose, and finding out later from the symptoms.

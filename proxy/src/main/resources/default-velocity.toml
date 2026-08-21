@@ -96,21 +96,55 @@ server-name = "auth"
 server-port = 30065
 
 # Plugins the proxy keeps up to date by itself.
-[plugins]
-# Names of plugins on hangar.papermc.io, exactly as they appear in the project's URL.
-# Capitalisation does not matter. On every start, before plugins are loaded, each one is
-# downloaded if it is missing and updated if a newer Release build exists. Only the Release
-# channel is used, never snapshots.
+#
+# On every start, before plugins are loaded, each plugin listed below is downloaded if it is
+# missing and updated if a newer build has been published. They are fetched all at once and
+# start-up waits for the last of them, so the loader never sees a half-finished directory.
+#
+# Only stable builds are used. Every source here also publishes snapshots, betas and development
+# builds, and the proxy will not move itself onto one of those on its own.
 #
 # If a plugin cannot be downloaded and no jar of it is installed, the proxy refuses to start
 # rather than run without a plugin you asked for. If a jar is already there, it warns and keeps
-# using the version you have, so a Hangar outage cannot take the proxy down.
+# using the version you have, so an outage cannot take the proxy down.
 #
 # Older jars of the same plugin are deleted when a new one is installed, including any you put
-# there by hand: two versions of one plugin in plugins/ is a duplicate id and a refusal to load.
+# there by hand: two jars claiming one plugin id make the loader refuse whichever it reads second.
 #
-# An empty list makes no network requests at all.
-hangar = []
+# Plugins from anywhere else still work as always -- put the jar in plugins/ and leave it off
+# these lists. Empty lists make no network requests at all.
+[plugins]
+
+# Project names on hangar.papermc.io, as they appear in the project's URL. Case does not matter.
+hangar = [
+    "ViaVersion"
+]
+
+# Project names on modrinth.com. This is the name in the URL, which is not always the title.
+modrinth = [
+    "ViaBackwards"
+]
+
+# GitHub repositories, written as owner/repo -- the owner cannot be left out, since nothing can
+# guess it. The latest release's .jar is used; add ":pattern" to choose between several.
+#
+# GitHub allows 60 unauthenticated requests an hour per address. If you restart often enough to
+# hit that, set a GITHUB_TOKEN environment variable. It is read from the environment and not from
+# here on purpose: a token in a configuration file is a secret sitting in plain text.
+github = [
+    "ViaVersion/ViaRewind"
+]
+
+# GeyserMC projects: "geyser" and "floodgate". They are on Hangar too, but only as a link
+# elsewhere with no version or checksum, so they are fetched from GeyserMC directly.
+geyser = [
+    "geyser",
+    "floodgate"
+]
+
+# LuckPerms is a switch rather than a list: there is only one, and on a proxy the platform is
+# always Velocity.
+luckperms = false
 
 [packet-limiter]
 # Size of the moving time window in seconds used to calculate average rates.

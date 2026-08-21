@@ -34,6 +34,7 @@ import com.velocitypowered.proxy.config.migration.MotdMigration;
 import com.velocitypowered.proxy.config.migration.OfflineAuthMigration;
 import com.velocitypowered.proxy.config.migration.PacketLimiterMigration;
 import com.velocitypowered.proxy.config.migration.TransferIntegrationMigration;
+import com.velocitypowered.proxy.plugin.update.PluginUpdater;
 import com.velocitypowered.proxy.util.AddressUtil;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.IOException;
@@ -1110,13 +1111,19 @@ public class VelocityConfiguration implements ProxyConfig {
   }
 
   /**
-   * Plugins the proxy keeps up to date for itself.
+   * Plugins the proxy keeps up to date for itself, by where they come from.
    *
-   * @param hangar plugin names on hangar.papermc.io
+   * @param hangar project names on hangar.papermc.io
+   * @param modrinth project names on modrinth.com
+   * @param github GitHub repositories, as {@code owner/repo} or {@code owner/repo:regex}
+   * @param geyser GeyserMC projects, which are {@code geyser} and {@code floodgate}
+   * @param luckperms whether to keep LuckPerms up to date
    */
-  public record PluginsConfig(List<String> hangar) {
+  public record PluginsConfig(List<String> hangar, List<String> modrinth, List<String> github,
+      List<String> geyser, boolean luckperms) {
 
-    public static final PluginsConfig DEFAULT = new PluginsConfig(List.of());
+    public static final PluginsConfig DEFAULT =
+        new PluginsConfig(List.of(), List.of(), List.of(), List.of(), false);
 
     /**
      * Returns a PluginsConfig from a config section, or the default if the section is null.
@@ -1128,13 +1135,38 @@ public class VelocityConfiguration implements ProxyConfig {
       if (config == null) {
         return DEFAULT;
       }
-      final List<String> hangar = config.getOrElse("hangar", List.<String>of());
-      // Blank entries are what a half-edited list looks like, and asking Hangar about "" only
-      // produces a confusing error later.
-      return new PluginsConfig(hangar.stream()
+      return new PluginsConfig(
+          names(config, "hangar"),
+          names(config, "modrinth"),
+          names(config, "github"),
+          names(config, "geyser"),
+          config.getOrElse("luckperms", false));
+    }
+
+    /**
+     * Everything the proxy has been asked to keep up to date, as source and identifier pairs.
+     *
+     * @return one entry per plugin, in configuration order
+     */
+    public List<PluginUpdater.Wanted> wanted() {
+      final List<PluginUpdater.Wanted> all = new java.util.ArrayList<>();
+      hangar.forEach(name -> all.add(new PluginUpdater.Wanted("hangar", name)));
+      modrinth.forEach(name -> all.add(new PluginUpdater.Wanted("modrinth", name)));
+      github.forEach(name -> all.add(new PluginUpdater.Wanted("github", name)));
+      geyser.forEach(name -> all.add(new PluginUpdater.Wanted("geyser", name)));
+      if (luckperms) {
+        all.add(new PluginUpdater.Wanted("luckperms", "LuckPerms"));
+      }
+      return List.copyOf(all);
+    }
+
+    /** Reads one list, dropping the blank entries a half-edited list leaves behind. */
+    private static List<String> names(final CommentedConfig config, final String key) {
+      final List<String> configured = config.getOrElse(key, List.<String>of());
+      return configured.stream()
           .map(String::trim)
           .filter(name -> !name.isEmpty())
-          .toList());
+          .toList();
     }
   }
 
