@@ -554,9 +554,18 @@ public class VelocityConfiguration implements ProxyConfig {
       throw new RuntimeException("Default configuration file does not exist.");
     }
 
-    // Create the forwarding-secret file on first-time startup if it doesn't exist
-    final Path defaultForwardingSecretPath = Path.of("forwarding.secret");
+    // night-config writes the file but not the directory holding it.
+    final Path configDir = path.toAbsolutePath().getParent();
+    if (configDir != null) {
+      Files.createDirectories(configDir);
+    }
+
+    // Create the forwarding-secret file on first-time startup if it doesn't exist. resolve() also
+    // moves a secret left over from the pre-config/ layout, so an existing one is found rather than
+    // replaced — a regenerated secret breaks modern forwarding on every backend at once.
+    final Path defaultForwardingSecretPath = ConfigurationLocation.resolveForwardingSecret(null);
     if (Files.notExists(path) && Files.notExists(defaultForwardingSecretPath)) {
+      Files.createDirectories(defaultForwardingSecretPath.getParent());
       Files.writeString(defaultForwardingSecretPath, generateRandomString(12));
     }
 
@@ -591,7 +600,7 @@ public class VelocityConfiguration implements ProxyConfig {
         final String forwardSecretFile = config.get("forwarding-secret-file");
         final Path secretPath = forwardSecretFile == null
                 ? defaultForwardingSecretPath
-                : Path.of(forwardSecretFile);
+                : ConfigurationLocation.resolveForwardingSecret(forwardSecretFile);
         if (Files.exists(secretPath)) {
           if (Files.isRegularFile(secretPath)) {
             forwardingSecretString = String.join("", Files.readAllLines(secretPath));
@@ -600,6 +609,7 @@ public class VelocityConfiguration implements ProxyConfig {
                     "The file " + forwardSecretFile + " is not a valid file or it is a directory.");
           }
         } else {
+          Files.createDirectories(secretPath.toAbsolutePath().getParent());
           Files.createFile(secretPath);
           Files.writeString(secretPath, forwardingSecretString = generateRandomString(12),
               StandardCharsets.UTF_8);

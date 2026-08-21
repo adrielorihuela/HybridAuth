@@ -20,6 +20,7 @@ package com.velocitypowered.proxy.config.migration;
 import static com.velocitypowered.proxy.config.VelocityConfiguration.generateRandomString;
 
 import com.electronwill.nightconfig.core.file.CommentedFileConfig;
+import com.velocitypowered.proxy.config.ConfigurationLocation;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -42,20 +43,24 @@ public final class ForwardingMigration implements ConfigurationMigration {
             config version 2.0.
             We will migrate your secret to the "forwarding.secret" file.""");
     final String actualSecret = config.get("forwarding-secret");
-    final Path path = Path.of(config.getOrElse("forwarding-secret-file", "forwarding.secret"));
+    // Resolved through ConfigurationLocation so the secret lands in config/ like everything else,
+    // and so an existing one from the older layout is moved rather than written over.
+    final Path path = ConfigurationLocation.resolveForwardingSecret(
+        config.getOrElse("forwarding-secret-file", ConfigurationLocation.SECRET_FILE_NAME));
     if (Files.exists(path)) {
       final String fileContents = Files.readString(path);
       if (fileContents.isBlank()) {
         Files.writeString(path, actualSecret == null ? generateRandomString(12) : actualSecret);
       }
     } else {
+      Files.createDirectories(path.toAbsolutePath().getParent());
       Files.createFile(path);
       Files.writeString(path, actualSecret == null ? generateRandomString(12) : actualSecret);
     }
     if (actualSecret != null) {
       config.remove("forwarding-secret");
     }
-    config.set("forwarding-secret-file", "forwarding.secret");
+    config.set("forwarding-secret-file", ConfigurationLocation.SECRET_FILE_NAME);
     config.setComment("forwarding-secret-file", """
                 If you are using modern or BungeeGuard IP forwarding, \
                 configure a file that contains a unique secret here.
