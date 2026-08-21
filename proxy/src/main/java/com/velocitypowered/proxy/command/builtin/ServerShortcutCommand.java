@@ -34,7 +34,7 @@ import net.kyori.adventure.text.minimessage.translation.Argument;
 
 /**
  * Implements the per-server shortcut commands configured by the {@code comandos} list in the
- * {@code [servers]} section of {@code hybridvelocity.toml}. A server named {@code Lobby} listed there
+ * {@code [servers]} section of {@code config/proxy.toml}. A server named {@code Lobby} listed there
  * gets a {@code /Lobby} command that connects the player straight to it.
  */
 public final class ServerShortcutCommand {

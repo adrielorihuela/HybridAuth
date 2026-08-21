@@ -17,21 +17,26 @@
 
 package com.velocitypowered.proxy.config;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 /**
  * Where this fork keeps its configuration: a {@code config/} directory next to the jar.
  *
- * <p>The file inside it is named after the fork rather than after upstream Velocity. An
- * installation that still has upstream's {@code velocity.toml}, or this fork's earlier
- * {@code hybridvelocity.toml} in the working directory, is moved on first start — without that,
- * updating the jar would silently start the proxy on stock defaults and lose every configured
- * server, the forwarding mode and the MOTD.</p>
+ * <p>The file inside it is {@code proxy.toml}, named for what it configures rather than for the
+ * proxy that reads it. An installation still holding any earlier name — this fork's
+ * {@code hybridvelocity.toml} or upstream Velocity's {@code velocity.toml}, in {@code config/} or
+ * in the proxy root — has it moved on first start. Without that, updating the jar would silently
+ * start the proxy on stock defaults and lose every configured server, the forwarding mode and the
+ * MOTD. Pointing this jar at an existing Velocity installation is therefore the whole
+ * migration.</p>
  *
  * <p>The same applies to {@code forwarding.secret}, and there it matters more: a proxy that cannot
  * find its secret generates a new one and carries on, and the only symptom is that every backend
@@ -48,10 +53,24 @@ public final class ConfigurationLocation {
   /** The directory holding the configuration. */
   public static final String DIRECTORY = "config";
 
-  /** The configuration file this fork reads. */
-  public static final String FILE_NAME = "hybridvelocity.toml";
+  /**
+   * The configuration file.
+   *
+   * <p>Named for what it configures rather than for the proxy that reads it: a file named after a
+   * product has to be renamed every time the product is, and every rename is another migration
+   * for operators to notice.</p>
+   */
+  public static final String FILE_NAME = "proxy.toml";
 
-  /** The name upstream Velocity uses, migrated away from on first start. */
+  /**
+   * Names this file has been through, newest first, searched when {@link #FILE_NAME} is absent.
+   *
+   * <p>{@code velocity.toml} is upstream's, and it is here so that pointing this jar at an
+   * existing Velocity installation is the whole migration.</p>
+   */
+  private static final String[] PREVIOUS_NAMES = {"hybridvelocity.toml", "velocity.toml"};
+
+  /** The name upstream Velocity uses. */
   public static final String LEGACY_FILE_NAME = "velocity.toml";
 
   /** The default name of the forwarding secret file, inside {@link #DIRECTORY}. */
@@ -86,20 +105,31 @@ public final class ConfigurationLocation {
       return path;
     }
 
-    // In order: this fork's previous location, then upstream's name. Both are "the configuration
-    // this installation has been using", and losing either means starting on stock defaults.
-    for (final String legacyName : new String[]{FILE_NAME, LEGACY_FILE_NAME}) {
-      final Path legacy = baseDir.resolve(legacyName);
+    // Every place a configuration could be sitting, newest first: an older name already inside
+    // config/, then either name still in the proxy root. All of them are "the configuration this
+    // installation has been using", and passing one over means starting on stock defaults --
+    // losing every configured server, the forwarding mode and the MOTD.
+    final List<Path> candidates = new ArrayList<>();
+    for (final String previous : PREVIOUS_NAMES) {
+      candidates.add(baseDir.resolve(DIRECTORY).resolve(previous));
+    }
+    candidates.add(baseDir.resolve(FILE_NAME));
+    for (final String previous : PREVIOUS_NAMES) {
+      candidates.add(baseDir.resolve(previous));
+    }
+
+    for (final Path legacy : candidates) {
       if (!Files.exists(legacy)) {
         continue;
       }
+      final String legacyName = baseDir.relativize(legacy).toString();
       if (move(legacy, path)) {
         logger.info("Moved {} to {}{}{}; your configuration was kept as it was.",
-            legacyName, DIRECTORY, java.io.File.separator, FILE_NAME);
+            legacyName, DIRECTORY, File.separator, FILE_NAME);
         return path;
       }
       logger.error("Could not move {} into {}{}. Reading it where it is — move it yourself to "
-          + "silence this.", legacyName, DIRECTORY, java.io.File.separator);
+          + "silence this.", legacyName, DIRECTORY, File.separator);
       return legacy;
     }
 
@@ -145,10 +175,10 @@ public final class ConfigurationLocation {
     if (Files.exists(legacy) && !legacy.equals(path)) {
       if (move(legacy, path)) {
         logger.info("Moved {} into {}{}; the secret itself is unchanged.",
-            name, DIRECTORY, java.io.File.separator);
+            name, DIRECTORY, File.separator);
       } else {
         logger.error("Could not move {} into {}{}. Using it where it is, so that the secret your "
-            + "backends already know keeps working.", name, DIRECTORY, java.io.File.separator);
+            + "backends already know keeps working.", name, DIRECTORY, File.separator);
         return legacy;
       }
     }

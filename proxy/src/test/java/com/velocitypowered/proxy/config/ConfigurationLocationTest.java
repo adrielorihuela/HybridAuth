@@ -35,7 +35,7 @@ class ConfigurationLocationTest {
 
   @Test
   void configurationIsReadFromTheConfigDirectory() {
-    assertEquals(dir.resolve("config").resolve("hybridvelocity.toml"),
+    assertEquals(dir.resolve("config").resolve("proxy.toml"),
         ConfigurationLocation.resolve(dir));
   }
 
@@ -45,7 +45,7 @@ class ConfigurationLocationTest {
 
     final Path resolved = ConfigurationLocation.resolve(dir);
 
-    assertEquals(dir.resolve("config").resolve("hybridvelocity.toml"), resolved);
+    assertEquals(dir.resolve("config").resolve("proxy.toml"), resolved);
     assertEquals("motd = \"mine\"", Files.readString(resolved));
     assertFalse(Files.exists(dir.resolve("velocity.toml")));
   }
@@ -56,7 +56,7 @@ class ConfigurationLocationTest {
 
     final Path resolved = ConfigurationLocation.resolve(dir);
 
-    assertEquals(dir.resolve("config").resolve("hybridvelocity.toml"), resolved);
+    assertEquals(dir.resolve("config").resolve("proxy.toml"), resolved);
     assertEquals("motd = \"mine\"", Files.readString(resolved));
     assertFalse(Files.exists(dir.resolve("hybridvelocity.toml")));
   }
@@ -71,7 +71,7 @@ class ConfigurationLocationTest {
 
   @Test
   void alreadyMigratedInstallationIsLeftAlone() throws IOException {
-    final Path existing = dir.resolve("config").resolve("hybridvelocity.toml");
+    final Path existing = dir.resolve("config").resolve("proxy.toml");
     Files.createDirectories(existing.getParent());
     Files.writeString(existing, "motd = \"current\"");
     Files.writeString(dir.resolve("velocity.toml"), "motd = \"stale\"");
@@ -79,6 +79,30 @@ class ConfigurationLocationTest {
     assertEquals("motd = \"current\"", Files.readString(ConfigurationLocation.resolve(dir)));
     // The stale one is not consulted, and not deleted either - that is the operator's to do.
     assertTrue(Files.exists(dir.resolve("velocity.toml")));
+  }
+
+  @Test
+  void olderNameAlreadyInsideConfigIsRenamed() throws IOException {
+    // Somebody who upgraded through 1.1.3, where config/ existed but the file was still named
+    // after the fork.
+    final Path older = dir.resolve("config").resolve("hybridvelocity.toml");
+    Files.createDirectories(older.getParent());
+    Files.writeString(older, "motd = \"mine\"");
+
+    final Path resolved = ConfigurationLocation.resolve(dir);
+
+    assertEquals(dir.resolve("config").resolve("proxy.toml"), resolved);
+    assertEquals("motd = \"mine\"", Files.readString(resolved));
+    assertFalse(Files.exists(older));
+  }
+
+  @Test
+  void velocityFileInsideConfigIsRenamedToo() throws IOException {
+    final Path older = dir.resolve("config").resolve("velocity.toml");
+    Files.createDirectories(older.getParent());
+    Files.writeString(older, "motd = \"mine\"");
+
+    assertEquals("motd = \"mine\"", Files.readString(ConfigurationLocation.resolve(dir)));
   }
 
   @Test
