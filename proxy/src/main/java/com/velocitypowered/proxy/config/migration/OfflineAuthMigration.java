@@ -32,9 +32,29 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  */
 public final class OfflineAuthMigration implements ConfigurationMigration {
 
+  /** The key this fork counts its own migrations with. See {@link #shouldMigrate}. */
+  public static final String FORK_VERSION_KEY = "hybridauth-config-version";
+
+  /** What this fork's migrations are up to. */
+  private static final double FORK_VERSION = 1.0;
+
+  /**
+   * The number upstream Velocity's own configurations carry today.
+   *
+   * <p>Used to undo a mistake: this migration used to write {@code config-version = "3.2"}, which
+   * is upstream's key and upstream's numbering. Upstream is at 2.8, so 3.2 sat on four numbers
+   * that are not ours to spend — and every upstream migration is gated on {@code <} a number, so
+   * a Velocity release adding one at 2.9 would have found 3.2 already there and skipped it
+   * silently, on every HybridAuth installation at once.</p>
+   */
+  private static final String UPSTREAM_VERSION = "2.8";
+
   @Override
   public boolean shouldMigrate(CommentedFileConfig config) {
-    return configVersion(config) < 3.2;
+    // Counted on our own key. config-version belongs to upstream and is left to upstream.
+    return config.getOptional(FORK_VERSION_KEY)
+        .map(value -> Double.parseDouble(value.toString()) < FORK_VERSION)
+        .orElse(true);
   }
 
   @Override
@@ -75,7 +95,20 @@ public final class OfflineAuthMigration implements ConfigurationMigration {
         a server with no socket could not be pinged by ViaVersion.
         Set 0 to let the system pick a free port on each start.""");
 
-    config.set("config-version", "3.2");
+    // Hand upstream's key back, if this installation is carrying the number we should never have
+    // written into it. Only ever from that exact value, and only while our own key is absent, so
+    // this cannot walk a legitimately newer configuration backwards.
+    final double upstreamVersion = configVersion(config);
+    if (upstreamVersion > 2.8 && upstreamVersion <= 3.2) {
+      config.set("config-version", UPSTREAM_VERSION);
+    }
+
+    config.set(FORK_VERSION_KEY, String.valueOf(FORK_VERSION));
+    config.setComment(FORK_VERSION_KEY, """
+        Which of this fork's own configuration migrations have run. Do not change it.
+        Kept apart from config-version, which is upstream Velocity's and counts upstream's
+        migrations - a fork writing its own numbers into that key makes later upstream migrations
+        think they have already run.""");
   }
 
   /**

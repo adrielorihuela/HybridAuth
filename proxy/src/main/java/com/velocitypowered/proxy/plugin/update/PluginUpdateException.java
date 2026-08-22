@@ -23,7 +23,8 @@ package com.velocitypowered.proxy.plugin.update;
  * <p>Its message is written to be read by an operator and completes the sentence "could not update
  * {@code <plugin>}: ...", because that is the only place it is ever shown.</p>
  */
-public final class PluginUpdateException extends Exception {
+public sealed class PluginUpdateException extends Exception
+    permits HangarSource.EmptyChannelException {
 
   private static final long serialVersionUID = 1L;
 

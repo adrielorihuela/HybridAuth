@@ -40,6 +40,16 @@ final class ModrinthSource implements PluginSource {
   private static final String API = "https://api.modrinth.com/v2/project/";
   private static final String VELOCITY_LOADER = "?loaders=%5B%22velocity%22%5D";
 
+  /**
+   * Modrinth's release types, most stable first.
+   *
+   * <p>Taken in order, and the newest build of the first type that has any is the one installed.
+   * Some plugins never publish a release — Simple Voice Chat's Velocity builds are all betas and
+   * alphas — and refusing those outright would mean the proxy could not install a plugin that
+   * exists and works.</p>
+   */
+  private static final String[] TYPES_BY_STABILITY = {"release", "beta", "alpha"};
+
   private final JsonApi api;
 
   ModrinthSource(final HttpClient httpClient) {
@@ -78,14 +88,20 @@ final class ModrinthSource implements PluginSource {
           + "of it.");
     }
 
-    final JsonObject version = latestRelease(versions);
+    // Newest-first but with the types mixed together, so the stable one is rarely the first
+    // entry: ViaBackwards lists six betas before the release the proxy should install.
+    JsonObject version = null;
+    String type = null;
+    for (final String candidate : TYPES_BY_STABILITY) {
+      version = newestOfType(versions, candidate);
+      if (version != null) {
+        type = candidate;
+        break;
+      }
+    }
     if (version == null) {
-      // Same reasoning as Hangar's channel=Release. Modrinth returns newest-first regardless of
-      // type, and for an actively developed plugin the newest is usually a beta or a snapshot:
-      // ViaBackwards answers 5.12.0-SNAPSHOT+621 unfiltered and 5.11.0 filtered.
-      throw new PluginUpdateException("Modrinth has Velocity builds of this project but none of "
-          + "them are marked as releases, only betas or alphas. The proxy will not put itself on "
-          + "a pre-release build on its own.");
+      throw new PluginUpdateException("Modrinth has Velocity builds of this project but none of a "
+          + "type this understands.");
     }
 
     final JsonElement files = version.get("files");
@@ -113,24 +129,22 @@ final class ModrinthSource implements PluginSource {
     }
 
     final String versionNumber = JsonApi.string(version, "version_number");
-    return new PluginRelease("modrinth", slug, versionNumber == null ? "unknown" : versionNumber,
+    // The type goes in the version string when it is not a release, so the log says what it
+    // installed rather than leaving a beta looking like a stable build.
+    final String label = versionNumber == null ? "unknown" : versionNumber;
+    return new PluginRelease("modrinth", slug,
+        "release".equals(type) ? label : label + " (" + type + ")",
         fileName, checksum, url);
   }
 
-  /**
-   * The newest version marked as a release.
-   *
-   * <p>Modrinth returns them newest-first but mixes the types together — the list for ViaBackwards
-   * starts with six betas before the first release — so this is a scan rather than a look at the
-   * first entry.</p>
-   */
-  private static @Nullable JsonObject latestRelease(final JsonArray versions) {
+  /** The newest version of one type, or null if the project publishes none of it. */
+  private static @Nullable JsonObject newestOfType(final JsonArray versions, final String type) {
     for (final JsonElement element : versions) {
       if (!element.isJsonObject()) {
         continue;
       }
       final JsonObject version = element.getAsJsonObject();
-      if ("release".equals(JsonApi.string(version, "version_type"))) {
+      if (type.equals(JsonApi.string(version, "version_type"))) {
         return version;
       }
     }

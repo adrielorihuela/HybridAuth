@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.electronwill.nightconfig.core.CommentedConfig;
 import com.velocitypowered.proxy.config.VelocityConfiguration.OfflineAuthConfig;
+import com.velocitypowered.proxy.config.migration.OfflineAuthMigration;
 import org.junit.jupiter.api.Test;
 
 class OfflineAuthConfigTest {
@@ -48,6 +49,14 @@ class OfflineAuthConfigTest {
   void databaseLocationIsNotConfigurable() {
     // It is the only copy of every registration; letting it be moved invites losing track of it.
     assertEquals("auth/player-passwords.db", OfflineAuthConfig.DATABASE_FILE);
+  }
+
+  @Test
+  void forkCountsItsMigrationsOnItsOwnKey() {
+    // Not on config-version. That key is upstream's, upstream is at 2.8, and every upstream
+    // migration is gated on being below a number -- so a fork writing 3.2 into it makes a future
+    // Velocity migration at 2.9 believe it has already run, on every installation at once.
+    assertEquals("hybridauth-config-version", OfflineAuthMigration.FORK_VERSION_KEY);
   }
 
   @Test

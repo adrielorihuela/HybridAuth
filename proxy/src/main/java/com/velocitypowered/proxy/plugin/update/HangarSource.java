@@ -37,6 +37,20 @@ final class HangarSource implements PluginSource {
 
   private static final String API = "https://hangar.papermc.io/api/v1/projects/";
 
+  /**
+   * Hangar's channels, most stable first.
+   *
+   * <p>Taken in order, and the newest build on the first channel that has any is the one
+   * installed. Asking for a channel matters: unfiltered, Hangar answers with whatever is newest,
+   * which for an actively developed plugin is a snapshot — ViaVersion answers
+   * {@code 5.12.0-SNAPSHOT+1053} that way and {@code 5.11.0} filtered to Release.</p>
+   *
+   * <p>Falling down the list matters just as much: Simple Voice Chat publishes Velocity builds
+   * only on Alpha and Beta, and stopping at Release would mean the proxy could not install a
+   * plugin that exists and works.</p>
+   */
+  private static final String[] CHANNELS_BY_STABILITY = {"Release", "Beta", "Alpha", "Snapshot"};
+
   private final JsonApi api;
 
   HangarSource(final HttpClient httpClient) {
@@ -50,30 +64,56 @@ final class HangarSource implements PluginSource {
 
   @Override
   public PluginRelease resolve(final String slug) throws PluginUpdateException {
-    final String url = API + URLEncoder.encode(slug, StandardCharsets.UTF_8)
-        + "/versions?limit=1&platform=VELOCITY&channel=Release";
-    final JsonElement body;
-    try {
-      body = api.get(url);
-    } catch (JsonApi.NotFoundException e) {
-      throw new PluginUpdateException("Hangar has no project by that name. Check the spelling "
-          + "against the project's page on hangar.papermc.io.");
+    final String project = URLEncoder.encode(slug, StandardCharsets.UTF_8);
+    PluginUpdateException lastFailure = null;
+
+    for (final String channel : CHANNELS_BY_STABILITY) {
+      final JsonElement body;
+      try {
+        body = api.get(API + project + "/versions?limit=1&platform=VELOCITY&channel=" + channel);
+      } catch (JsonApi.NotFoundException e) {
+        throw new PluginUpdateException("Hangar has no project by that name. Check the spelling "
+            + "against the project's page on hangar.papermc.io.");
+      }
+      try {
+        return parse(slug, body, channel);
+      } catch (EmptyChannelException e) {
+        continue;
+      } catch (PluginUpdateException e) {
+        // A real problem with this build rather than an empty channel -- an external link, say.
+        // Remember it, but keep looking: a lower channel may be perfectly installable.
+        lastFailure = e;
+      }
     }
-    return parse(slug, body);
+
+    throw lastFailure != null ? lastFailure
+        : new PluginUpdateException("Hangar knows the project but publishes no Velocity build of "
+            + "it on any channel. It may be a Paper-only plugin.");
+  }
+
+  /** Thrown when a channel simply has nothing, which is not a failure worth reporting. */
+  static final class EmptyChannelException extends PluginUpdateException {
+    private static final long serialVersionUID = 1L;
+
+    EmptyChannelException() {
+      super("this channel has no Velocity build.");
+    }
   }
 
   /** Split out from the request so the shape of a real answer can be tested without the network. */
   static PluginRelease parse(final String slug, final JsonElement body)
+      throws PluginUpdateException {
+    return parse(slug, body, "Release");
+  }
+
+  static PluginRelease parse(final String slug, final JsonElement body, final String channel)
       throws PluginUpdateException {
     if (!body.isJsonObject()) {
       throw new PluginUpdateException("Hangar's answer was not the JSON object expected.");
     }
     final JsonElement result = body.getAsJsonObject().get("result");
     if (result == null || !result.isJsonArray() || result.getAsJsonArray().isEmpty()) {
-      // The project exists — a missing one is a 404 — so this is a plugin that publishes nothing
-      // for Velocity, or nothing on the Release channel.
-      throw new PluginUpdateException("Hangar knows the project but publishes no Velocity release "
-          + "of it. It may be a Paper-only plugin, or have only snapshot builds.");
+      throw new EmptyChannelException();
     }
 
     final JsonArray versions = result.getAsJsonArray();
@@ -102,7 +142,11 @@ final class HangarSource implements PluginSource {
     }
     final String versionName = JsonApi.string(version, "name");
 
-    return new PluginRelease("hangar", slug, versionName == null ? "unknown" : versionName,
+    // The channel goes in the version string when it is not Release, so the log says what it
+    // installed rather than leaving a beta looking like a stable build.
+    final String label = versionName == null ? "unknown" : versionName;
+    return new PluginRelease("hangar", slug,
+        "Release".equals(channel) ? label : label + " (" + channel + ")",
         fileName,
         sha256 == null ? null : new PluginRelease.Checksum("SHA-256", sha256),
         downloadUrl);

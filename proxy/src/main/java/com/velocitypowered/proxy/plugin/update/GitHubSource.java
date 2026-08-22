@@ -85,7 +85,17 @@ final class GitHubSource implements PluginSource {
       throw new PluginUpdateException("GitHub has no repository '" + repo + "', or it has no "
           + "published releases.");
     }
-    return parse(repo, assetPattern, body);
+
+    // The download carries the same authorization as the lookup. Without it a private repository
+    // cannot be reached at all, and neither can a public one belonging to an account GitHub has
+    // flagged: github.com paths answer 404 to everybody, token or not, while the API keeps
+    // serving the file.
+    final Map<String, String> downloadHeaders = new HashMap<>();
+    downloadHeaders.put("Accept", "application/octet-stream");
+    if (token != null) {
+      downloadHeaders.put("Authorization", "Bearer " + token);
+    }
+    return parse(repo, assetPattern, body, downloadHeaders);
   }
 
   /**
@@ -118,6 +128,12 @@ final class GitHubSource implements PluginSource {
   /** Split out from the request so asset selection can be tested without the network. */
   static PluginRelease parse(final String repo, final @Nullable String assetPattern,
       final JsonElement body) throws PluginUpdateException {
+    return parse(repo, assetPattern, body, Map.of());
+  }
+
+  static PluginRelease parse(final String repo, final @Nullable String assetPattern,
+      final JsonElement body, final Map<String, String> downloadHeaders)
+      throws PluginUpdateException {
     if (!body.isJsonObject()) {
       throw new PluginUpdateException("GitHub's answer was not the JSON object expected.");
     }
@@ -143,7 +159,9 @@ final class GitHubSource implements PluginSource {
       }
       final JsonObject asset = element.getAsJsonObject();
       final String fileName = JsonApi.string(asset, "name");
-      final String url = JsonApi.string(asset, "browser_download_url");
+      // The API's own asset URL, not browser_download_url: this one honours the Authorization
+      // header, and the browser path does not.
+      final String url = JsonApi.string(asset, "url");
       if (fileName == null || url == null
           || !fileName.toLowerCase(Locale.ROOT).endsWith(".jar")
           || NOT_A_PLUGIN.matcher(fileName).find()
@@ -160,7 +178,8 @@ final class GitHubSource implements PluginSource {
 
       final String version = tag == null ? "unknown"
           : tag.startsWith("v") ? tag.substring(1) : tag;
-      return new PluginRelease("github", repo, version, fileName, checksum, url);
+      return new PluginRelease("github", repo, version, fileName, checksum, url,
+          downloadHeaders);
     }
 
     throw new PluginUpdateException(assetPattern == null

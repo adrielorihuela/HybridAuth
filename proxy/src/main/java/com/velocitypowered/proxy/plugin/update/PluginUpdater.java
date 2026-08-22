@@ -233,7 +233,7 @@ public final class PluginUpdater {
     logger.info("Updating {} to {} from {}...", label, release.version(), release.source());
     final Path part = pluginDirectory.resolve(release.fileName() + ".part");
     try {
-      download(release.downloadUrl(), part);
+      download(release, part);
 
       final PluginRelease.Checksum checksum = release.checksum();
       if (checksum != null) {
@@ -279,16 +279,16 @@ public final class PluginUpdater {
     return true;
   }
 
-  private void download(final String url, final Path destination)
+  private void download(final PluginRelease release, final Path destination)
       throws PluginUpdateException, IOException {
-    final HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+    final HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(release.downloadUrl()))
         .header("User-Agent", "HybridAuth")
         .timeout(DOWNLOAD_TIMEOUT)
-        .GET()
-        .build();
+        .GET();
+    release.downloadHeaders().forEach(builder::setHeader);
     try {
       final HttpResponse<InputStream> response =
-          httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+          httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
       if (response.statusCode() != 200) {
         throw new PluginUpdateException("the download answered " + response.statusCode() + ".");
       }
