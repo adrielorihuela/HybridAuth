@@ -1,4 +1,4 @@
-# HybridVelocity
+# HybridAuth
 
 **Run one Minecraft server for cracked and premium players at the same time.** A fork of
 [Velocity](https://github.com/PaperMC/Velocity) with `/register` and `/login` built into the proxy
@@ -19,7 +19,7 @@ Licensed under the GPLv3, like Velocity.
 ## What it does
 
 **Non-premium players are welcome, and must prove who they are.** Upstream Velocity kicks anyone
-Mojang cannot verify. HybridVelocity gives them an offline identity instead and holds them on a
+Mojang cannot verify. HybridAuth gives them an offline identity instead and holds them on a
 small authentication server running inside the proxy until they `/register` or `/login`. Only then
 do they reach a real server. Premium players are untouched — they connect exactly as before, with no
 prompt.
@@ -47,16 +47,16 @@ Geyser and Floodgate.
 
 ## Quick start
 
-Download `HybridVelocity-<version>.jar` from the
-[releases](https://github.com/adrielorihuela/HybridVelocity/releases) and run it:
+Download `HybridAuth-<version>.jar` from the
+[releases](https://github.com/adrielorihuela/HybridAuth/releases) and run it:
 
 ```bash
-java -Xms512M -Xmx512M -jar HybridVelocity-1.1.1.jar
+java -Xms512M -Xmx512M -jar HybridAuth-1.1.1.jar
 ```
 
 Upgrading from stock Velocity? Just swap the jar — your `velocity.toml` is renamed and migrated,
 contents intact. Permissions keep working too: the `velocity.command.*` nodes are still honoured
-alongside the new `hybridvelocity.command.*` ones.
+alongside the new `hybridauth.command.*` ones.
 
 Then read [docs/guide/getting-started.md](docs/guide/getting-started.md).
 
@@ -77,7 +77,7 @@ Anything not covered there behaves as upstream, so the
 ```
 
 Uses the Gradle wrapper (`./gradlew.bat` on Windows) and runs Checkstyle, Spotless and the tests.
-The runnable jar is `proxy/build/libs/HybridVelocity-<version>.jar`. Java 25 is required.
+The runnable jar is `proxy/build/libs/HybridAuth-<version>.jar`. Java 25 is required.
 
 ## Upstream
 

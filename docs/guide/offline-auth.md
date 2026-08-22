@@ -1,6 +1,6 @@
 # Offline player authentication
 
-HybridVelocity requires players that Mojang cannot authenticate to register a password and log in
+HybridAuth requires players that Mojang cannot authenticate to register a password and log in
 before they reach any of your servers. They wait on an authentication server that runs **inside the
 proxy** — there is no extra server to install, configure or monitor.
 

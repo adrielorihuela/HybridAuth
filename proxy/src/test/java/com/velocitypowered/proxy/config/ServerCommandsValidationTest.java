@@ -40,7 +40,7 @@ class ServerCommandsValidationTest {
     final Path secret = directory.resolve("forwarding.secret");
     Files.writeString(secret, "test-secret", StandardCharsets.UTF_8);
 
-    final Path config = directory.resolve("hybridvelocity.toml");
+    final Path config = directory.resolve("hybridauth.toml");
     Files.writeString(config, """
         config-version = "3.2"
         bind = "0.0.0.0:25565"

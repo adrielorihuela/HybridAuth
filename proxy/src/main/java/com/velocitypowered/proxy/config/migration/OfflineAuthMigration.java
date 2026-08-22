@@ -24,7 +24,7 @@ import org.apache.logging.log4j.Logger;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
- * Configuration migration for the offline authentication options, added by HybridVelocity.
+ * Configuration migration for the offline authentication options, added by HybridAuth.
  *
  * <p>These options have moved twice — an {@code [offline-auth]} section, then three top-level
  * keys, and now back to the section with shorter names. Whatever the operator had chosen is carried

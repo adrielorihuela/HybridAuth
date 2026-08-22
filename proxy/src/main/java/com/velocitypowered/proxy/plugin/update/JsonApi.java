@@ -38,7 +38,7 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 final class JsonApi {
 
   private static final Duration TIMEOUT = Duration.ofSeconds(30);
-  private static final String USER_AGENT = "HybridVelocity";
+  private static final String USER_AGENT = "HybridAuth";
 
   private final HttpClient httpClient;
 

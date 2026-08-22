@@ -35,7 +35,7 @@ class ConfigurationLocationTest {
 
   @Test
   void configurationIsReadFromTheConfigDirectory() {
-    assertEquals(dir.resolve("config").resolve("proxy.toml"),
+    assertEquals(dir.resolve("config").resolve("HybridAuth.toml"),
         ConfigurationLocation.resolve(dir));
   }
 
@@ -45,7 +45,7 @@ class ConfigurationLocationTest {
 
     final Path resolved = ConfigurationLocation.resolve(dir);
 
-    assertEquals(dir.resolve("config").resolve("proxy.toml"), resolved);
+    assertEquals(dir.resolve("config").resolve("HybridAuth.toml"), resolved);
     assertEquals("motd = \"mine\"", Files.readString(resolved));
     assertFalse(Files.exists(dir.resolve("velocity.toml")));
   }
@@ -56,7 +56,7 @@ class ConfigurationLocationTest {
 
     final Path resolved = ConfigurationLocation.resolve(dir);
 
-    assertEquals(dir.resolve("config").resolve("proxy.toml"), resolved);
+    assertEquals(dir.resolve("config").resolve("HybridAuth.toml"), resolved);
     assertEquals("motd = \"mine\"", Files.readString(resolved));
     assertFalse(Files.exists(dir.resolve("hybridvelocity.toml")));
   }
@@ -71,7 +71,7 @@ class ConfigurationLocationTest {
 
   @Test
   void alreadyMigratedInstallationIsLeftAlone() throws IOException {
-    final Path existing = dir.resolve("config").resolve("proxy.toml");
+    final Path existing = dir.resolve("config").resolve("HybridAuth.toml");
     Files.createDirectories(existing.getParent());
     Files.writeString(existing, "motd = \"current\"");
     Files.writeString(dir.resolve("velocity.toml"), "motd = \"stale\"");
@@ -91,7 +91,7 @@ class ConfigurationLocationTest {
 
     final Path resolved = ConfigurationLocation.resolve(dir);
 
-    assertEquals(dir.resolve("config").resolve("proxy.toml"), resolved);
+    assertEquals(dir.resolve("config").resolve("HybridAuth.toml"), resolved);
     assertEquals("motd = \"mine\"", Files.readString(resolved));
     assertFalse(Files.exists(older));
   }
@@ -103,6 +103,27 @@ class ConfigurationLocationTest {
     Files.writeString(older, "motd = \"mine\"");
 
     assertEquals("motd = \"mine\"", Files.readString(ConfigurationLocation.resolve(dir)));
+  }
+
+  @Test
+  void nameFromTheVersionBeforeIsRenamed() throws IOException {
+    // What an installation upgraded to 1.1.3 is carrying.
+    final Path older = dir.resolve("config").resolve("proxy.toml");
+    Files.createDirectories(older.getParent());
+    Files.writeString(older, "motd = \"mine\"");
+
+    final Path resolved = ConfigurationLocation.resolve(dir);
+
+    assertEquals(dir.resolve("config").resolve("HybridAuth.toml"), resolved);
+    assertEquals("motd = \"mine\"", Files.readString(resolved));
+    assertFalse(Files.exists(older));
+  }
+
+  @Test
+  void extensionIsLoadBearing() {
+    // night-config picks its parser from the extension and throws on one it does not know, so a
+    // rename to .config would stop the proxy from starting at all.
+    assertTrue(ConfigurationLocation.FILE_NAME.endsWith(".toml"));
   }
 
   @Test

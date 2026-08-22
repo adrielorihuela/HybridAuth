@@ -4,7 +4,7 @@
 # cheap: no messages, no tab list, no HUD, one thread.
 #
 # The bind address and the player-info forwarding are deliberately absent. The proxy passes them in
-# directly from hybridvelocity.toml ([offline-auth] server-port and player-info-forwarding-mode),
+# directly from hybridauth.toml ([offline-auth] server-port and player-info-forwarding-mode),
 # because binding anywhere but 127.0.0.1 would expose this server to the network and a forwarding
 # mode that disagrees with the proxy's breaks the handshake.
 
@@ -14,8 +14,8 @@ maxPlayers: 100
 # What this shows if something pings it directly. Players never see it: this server is only
 # reachable on loopback, and it is hidden from /server and the other command listings.
 ping:
-  description: "HybridVelocity authentication"
-  version: "HybridVelocity"
+  description: "HybridAuth authentication"
+  version: "HybridAuth"
   # -1 reports the connecting client's own protocol, so every client version is accepted.
   protocol: -1
 
@@ -51,7 +51,7 @@ headerAndFooter:
 # The server name shown in the F3 debug screen on 1.13+.
 brandName:
   enable: false
-  content: "HybridVelocity"
+  content: "HybridAuth"
 
 # A chat message sent on arrival. Off, so the only chat is the authentication prompt.
 joinMessage:

@@ -279,9 +279,9 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
     commandManager.register(
         commandManager.metaBuilder(velocityParentCommand)
             .plugin(VelocityVirtualPlugin.INSTANCE)
-            // `hv` because the full name is a mouthful, `velocity` because that is what anyone
-            // coming from upstream will type.
-            .aliases("hv", "velocity")
+            // `ha` and `hv` because the full name is a mouthful, and the two older names because
+            // that is what anyone coming from upstream or from an earlier version will type.
+            .aliases("ha", "hv", "hybridvelocity", "velocity")
             .build(),
         velocityParentCommand
     );
@@ -608,7 +608,7 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
       configuration = VelocityConfiguration.read(configPath);
 
       if (!configuration.validate()) {
-        logger.error("Your configuration is invalid. HybridVelocity will not start up until the errors "
+        logger.error("Your configuration is invalid. HybridAuth will not start up until the errors "
             + "are resolved.");
         LogManager.shutdown();
         System.exit(1);
@@ -641,7 +641,7 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
       // Only reached when a listed plugin is not on disk at all. Starting anyway means running
       // without a plugin somebody listed on purpose, and finding out later from the symptoms.
       logger.error("Could not install every plugin listed in [plugins]: {}", e.getMessage());
-      logger.error("HybridVelocity will not start without them. Remove the plugin from the list "
+      logger.error("HybridAuth will not start without them. Remove the plugin from the list "
           + "if you no longer want it, or install its jar in plugins/ yourself.");
       LogManager.shutdown();
       System.exit(1);

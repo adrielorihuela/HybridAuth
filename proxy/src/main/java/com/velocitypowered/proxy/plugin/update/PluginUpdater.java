@@ -274,7 +274,7 @@ public final class PluginUpdater {
   private void download(final String url, final Path destination)
       throws PluginUpdateException, IOException {
     final HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-        .header("User-Agent", "HybridVelocity")
+        .header("User-Agent", "HybridAuth")
         .timeout(DOWNLOAD_TIMEOUT)
         .GET()
         .build();

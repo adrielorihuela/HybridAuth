@@ -1,7 +1,7 @@
 # Hybrid offline profiles
 
 An online-mode Velocity proxy disconnects any player that Mojang's session server does not
-recognise, with the `velocity.error.online-mode-only` message. HybridVelocity accepts those
+recognise, with the `velocity.error.online-mode-only` message. HybridAuth accepts those
 players instead, giving them an offline identity that cannot collide with a premium one.
 
 ## Login flow

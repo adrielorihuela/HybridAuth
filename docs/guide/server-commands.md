@@ -1,6 +1,6 @@
 # Per-server shortcut commands
 
-HybridVelocity can create a command for each of your servers, so that a player can type
+HybridAuth can create a command for each of your servers, so that a player can type
 `/Lobby` to be sent to the `Lobby` server instead of `/server Lobby`.
 
 ## Configuration
@@ -43,15 +43,15 @@ Rules:
 
 ## Permissions
 
-Each command checks the permission `hybridvelocity.command.server.<server name in lowercase>` —
-for example `hybridvelocity.command.server.lobby`.
+Each command checks the permission `hybridauth.command.server.<server name in lowercase>` —
+for example `hybridauth.command.server.lobby`.
 
 The check follows the same permissive style as Velocity's own `/server` command: the
 command is allowed unless the permission is explicitly set to **false**. That means:
 
 * With no permissions plugin installed, every player can use every configured command.
 * A permissions plugin can hide and block a specific command by negating its node, for
-  example `-hybridvelocity.command.server.lobby` in LuckPerms.
+  example `-hybridauth.command.server.lobby` in LuckPerms.
 * Granting the node explicitly also works, and is a no-op unless something else denies it.
 
 Because each server has its own node, per-server access can be given to different ranks

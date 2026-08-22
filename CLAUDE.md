@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repository is
 
-HybridVelocity is a fork of [Velocity](https://github.com/PaperMC/Velocity), the Minecraft
+HybridAuth is a fork of [Velocity](https://github.com/PaperMC/Velocity), the Minecraft
 server proxy. Most of the tree is upstream code.
 
 **Read the docs before changing anything in login, configuration, commands or the `:limbo`
@@ -39,7 +39,7 @@ Fork-specific behaviour:
 
 The configuration is `config/proxy.toml` — named for what it configures, not for the proxy, so the
 next rename of the fork is not another migration. `ConfigurationLocation` owns that directory and
-moves any earlier name into place on first start (`hybridvelocity.toml`, upstream's
+moves any earlier name into place on first start (`hybridauth.toml`, upstream's
 `velocity.toml`, in `config/` or in the proxy root), along with `forwarding.secret`. The secret is **moved and
 never regenerated** — a fresh one is accepted by the proxy and rejected by every backend on modern
 forwarding, with no error anywhere to explain it. Permission nodes keep the `velocity.` prefix —
@@ -107,8 +107,8 @@ reasoning is in `docs/development/updating-upstreams.md`.
 
 Run the proxy locally; it generates `config/proxy.toml`, `config/forwarding.secret` and
 `lang/` in `proxy/run/`. The build produces two jars in `proxy/build/libs/`:
-`HybridVelocity-<forkVersion>.jar` is the runnable distributable and the one to attach to a
-release; `HybridVelocity-<forkVersion>-thin.jar` is not runnable and only feeds `shadowJar`.
+`HybridAuth-<forkVersion>.jar` is the runnable distributable and the one to attach to a
+release; `HybridAuth-<forkVersion>-thin.jar` is not runnable and only feeds `shadowJar`.
 
 ### Versioning
 
@@ -119,7 +119,7 @@ Two versions coexist, and they are not interchangeable:
   it to express a fork release.
 - `forkName` / `forkVersion` in `gradle.properties` name the **fork's distributable**. The
   proxy's `shadowJar` uses them for the archive name and manifest, and `VelocityServer#getVersion`
-  reads that manifest, which is why the proxy logs `Booting up HybridVelocity <forkVersion>`.
+  reads that manifest, which is why the proxy logs `Booting up HybridAuth <forkVersion>`.
   Bump `forkVersion` for a fork release and tag it `v<forkVersion>`.
 
 ### Java 25 is a hard requirement
@@ -182,7 +182,7 @@ built-in commands, loads the configuration, registers servers, loads plugins, fi
 `ProxyInitializeEvent` and binds. Note the ordering constraint: built-in commands are
 registered *before* the config is loaded, so anything that depends on configuration (like the
 server shortcut commands) must be registered after the server-registration loop.
-`reloadConfiguration()` is the mirror image for `/hybridvelocity reload` and must be updated
+`reloadConfiguration()` is the mirror image for `/hybridauth reload` and must be updated
 whenever startup gains configuration-derived state.
 
 `VelocityConfiguration` deserializes `config/proxy.toml` with night-config, using
@@ -201,7 +201,7 @@ assume the native path is available. `limbo/` is vendored third-party source —
 `limbo/upstream/` is a pristine `git subtree` of [NanoLimbo](https://github.com/Nan1t/NanoLimbo)
 (GPL-3.0, same licence as this fork). The module's build script sits *outside* the subtree and
 points `sourceSets` into it, so upstream stays byte-identical and `git subtree pull` does not
-conflict. Three upstream files carry local patches, each marked `HybridVelocity patch:` and listed
+conflict. Three upstream files carry local patches, each marked `HybridAuth patch:` and listed
 in `docs/development/auth-server.md` — keep that list accurate and the patch surface small.
 
 **Checkstyle is disabled and Spotless excludes `upstream/**` for that module.** This is a
@@ -263,11 +263,11 @@ database lookup — the `requires` predicates run earlier, while the answer is s
 
 Commands are Brigadier nodes registered through `VelocityCommandManager`, which lowercases
 aliases (so commands are case-insensitive regardless of the literal's casing). The proxy's own
-command is `/hybridvelocity`, with `hv` and `velocity` as aliases.
+command is `/hybridauth`, with `hv` and `velocity` as aliases.
 
 Permissions are tri-state and are checked **only** through the two helpers in
 `command/builtin/BuiltinCommandUtil.java`, never by calling `getPermissionValue` directly. Nodes are
-`hybridvelocity.command.*`, and each helper also consults the pre-rename `velocity.command.*` node so
+`hybridauth.command.*`, and each helper also consults the pre-rename `velocity.command.*` node so
 that renaming did not revoke anything operators had already granted:
 
 - `isAllowed` — privileged commands. Granted only if a node says so, and the legacy node is read

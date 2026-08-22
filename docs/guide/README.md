@@ -1,4 +1,4 @@
-# Using HybridVelocity
+# Using HybridAuth
 
 | Document | |
 | --- | --- |

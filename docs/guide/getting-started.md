@@ -1,6 +1,6 @@
 # Getting started
 
-HybridVelocity runs like any Velocity proxy. If you have used Velocity before, everything you know
+HybridAuth runs like any Velocity proxy. If you have used Velocity before, everything you know
 still applies — this page only covers what is different.
 
 ## Install
@@ -8,11 +8,11 @@ still applies — this page only covers what is different.
 **Java 25 or newer is required.** Nothing else works — the whole proxy is compiled for it. Starting
 on an older runtime prints a message telling you so rather than a stack trace.
 
-Download `HybridVelocity-<version>.jar` from the
-[releases](https://github.com/adrielorihuela/HybridVelocity/releases) and run it:
+Download `HybridAuth-<version>.jar` from the
+[releases](https://github.com/adrielorihuela/HybridAuth/releases) and run it:
 
 ```bash
-java -Xms512M -Xmx512M -jar HybridVelocity-1.1.1.jar
+java -Xms512M -Xmx512M -jar HybridAuth-1.1.1.jar
 ```
 
 ### Getting more out of the same machine
@@ -24,7 +24,7 @@ collected quickly:
 ```bash
 java -Xms512M -Xmx512M \
      -XX:+UseG1GC -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=4M \
-     -jar HybridVelocity-1.1.1.jar
+     -jar HybridAuth-1.1.1.jar
 ```
 
 Set `-Xms` equal to `-Xmx` so the heap is never resized at runtime. 512 MB is plenty for a few

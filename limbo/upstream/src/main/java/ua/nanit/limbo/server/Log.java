@@ -25,8 +25,8 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-// HybridVelocity patch: the logger is named after the authentication server, matching the server
-// name in hybridvelocity.toml, so the console reads [auth] rather than [Limbo].
+// HybridAuth patch: the logger is named after the authentication server, matching the server
+// name in hybridauth.toml, so the console reads [auth] rather than [Limbo].
 @UtilityClass
 public class Log {
 
@@ -61,7 +61,7 @@ public class Log {
         return debugLevel >= Level.DEBUG.getIndex();
     }
 
-    // HybridVelocity patch: upstream casts the SLF4J logger to ch.qos.logback.classic.Logger to set
+    // HybridAuth patch: upstream casts the SLF4J logger to ch.qos.logback.classic.Logger to set
     // the level programmatically. Embedded in the proxy the backend is log4j2, not logback, so that
     // cast would throw. The level is left to the proxy's own logging configuration; this only keeps
     // track of it for isDebug().

@@ -142,8 +142,8 @@ not line up.
 
 ### Re-apply the local patches
 
-The subtree is otherwise byte-identical to upstream. Only two files are patched, both marked in the
-source with `HybridVelocity patch:`, and both are listed in [auth-server.md](auth-server.md):
+The subtree is otherwise byte-identical to upstream. Three files are patched, each marked in the
+source with `HybridAuth patch:`, and all are listed in [auth-server.md](auth-server.md):
 
 - `server/Log.java` — logs through SLF4J instead of casting to a logback logger, and names the
   logger `auth`.
@@ -177,4 +177,4 @@ would rewrite NanoLimbo's GPL copyright notices to "Velocity Contributors".
    API version that plugins compile against.
 2. `./gradlew build`, then run the shaded jar and check the boot line and the authentication server.
 3. Tag `v<forkVersion>` and push the tag.
-4. Create the release with `HybridVelocity-<forkVersion>.jar`.
+4. Create the release with `HybridAuth-<forkVersion>.jar`.

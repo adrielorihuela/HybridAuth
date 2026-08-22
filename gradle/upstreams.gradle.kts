@@ -166,7 +166,7 @@ tasks.register("updateAuthServer") {
           appendLine()
         }
         appendLine("Files under " + limboPrefix + " that carry local patches are marked in the "
-            + "source with 'HybridVelocity patch:'. If one of them is in the list, keep the patch "
+            + "source with 'HybridAuth patch:'. If one of them is in the list, keep the patch "
             + "and re-apply it on top of upstream's change - never resolve by dropping it. "
             + "docs/development/auth-server.md says what each one is for.")
         appendLine()
@@ -177,7 +177,7 @@ tasks.register("updateAuthServer") {
 
     println()
     println("Subtree updated. Three things do not happen by themselves:")
-    println("  1. Check the 'HybridVelocity patch:' markers under " + limboPrefix + " survived.")
+    println("  1. Check the 'HybridAuth patch:' markers under " + limboPrefix + " survived.")
     println("  2. Bump LIMBO_VERSION in limbo/src/main/java/ua/nanit/limbo/BuildConfig.java.")
     println("  3. Compare upstream's libs.versions.toml with ours - the subtree compiles against")
     println("     our versions, and Netty especially must agree on both sides.")

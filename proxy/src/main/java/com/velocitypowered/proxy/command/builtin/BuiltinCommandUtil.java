@@ -29,16 +29,21 @@ import java.util.List;
 class BuiltinCommandUtil {
 
   /** Prefix of this fork's permission nodes. */
-  static final String PERMISSION_PREFIX = "hybridvelocity.command.";
+  static final String PERMISSION_PREFIX = "hybridauth.command.";
 
   /**
-   * Prefix these nodes used before the fork was renamed.
+   * Prefixes these nodes have used before, still honoured as fallbacks.
    *
-   * <p>Still honoured as a fallback so that renaming did not silently revoke access that operators
-   * had already granted in their permissions plugin. It can be dropped in a future major version,
-   * once nobody is running a configuration that predates the rename.</p>
+   * <p>A rename that silently revokes access an operator has already granted is a rename that
+   * breaks their server, and they would have no way to connect the two events. So every prefix
+   * this project has used keeps working: {@code hybridvelocity.} from the first rename and
+   * {@code velocity.} from upstream. They are literals on purpose — a name that existed in the
+   * past must never be renamed along with the current one, or the fallback stops finding
+   * anything. They can be dropped in a future major version, once nobody is
+   * running a permissions setup that predates them.</p>
    */
-  static final String LEGACY_PERMISSION_PREFIX = "velocity.command.";
+  static final String[] LEGACY_PERMISSION_PREFIXES = {
+      "hybridvelocity.command.", "velocity.command."};
 
   private BuiltinCommandUtil() {
     throw new AssertionError();
@@ -66,15 +71,21 @@ class BuiltinCommandUtil {
     if (current != Tristate.UNDEFINED) {
       return current == Tristate.TRUE;
     }
-    return source.getPermissionValue(LEGACY_PERMISSION_PREFIX + suffix) == Tristate.TRUE;
+    for (final String legacy : LEGACY_PERMISSION_PREFIXES) {
+      final Tristate value = source.getPermissionValue(legacy + suffix);
+      if (value != Tristate.UNDEFINED) {
+        return value == Tristate.TRUE;
+      }
+    }
+    return false;
   }
 
   /**
    * Whether a command everyone should have is allowed — denied only if a permission says so.
    *
-   * <p>Used by {@code /server} and the per-server shortcut commands. <strong>Either</strong> node
-   * saying no is enough to deny: an operator who wrote {@code -velocity.command.server.lobby} before
-   * the rename still expects it to block, and treating the two nodes as a plain OR would silently
+   * <p>Used by {@code /server} and the per-server shortcut commands. <strong>Any</strong> node
+   * saying no is enough to deny: an operator who wrote {@code -velocity.command.server.lobby}
+   * before a rename still expects it to block, and treating the nodes as a plain OR would silently
    * stop honouring it.</p>
    *
    * @param source the command source
@@ -82,7 +93,14 @@ class BuiltinCommandUtil {
    * @return whether the source may run the command
    */
   static boolean isNotDenied(final CommandSource source, final String suffix) {
-    return source.getPermissionValue(PERMISSION_PREFIX + suffix) != Tristate.FALSE
-        && source.getPermissionValue(LEGACY_PERMISSION_PREFIX + suffix) != Tristate.FALSE;
+    if (source.getPermissionValue(PERMISSION_PREFIX + suffix) == Tristate.FALSE) {
+      return false;
+    }
+    for (final String legacy : LEGACY_PERMISSION_PREFIXES) {
+      if (source.getPermissionValue(legacy + suffix) == Tristate.FALSE) {
+        return false;
+      }
+    }
+    return true;
   }
 }

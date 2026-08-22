@@ -1,4 +1,4 @@
-# HybridVelocity documentation
+# HybridAuth documentation
 
 Everything this fork adds on top of upstream [Velocity](https://docs.papermc.io/velocity). Anything
 not covered here behaves exactly as it does upstream, so the Velocity documentation still applies.

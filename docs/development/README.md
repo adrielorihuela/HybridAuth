@@ -1,4 +1,4 @@
-# How HybridVelocity was built
+# How HybridAuth was built
 
 The record of the work behind the fork: the specification it set out to satisfy, the protocol
 research, the attempt that failed and what it cost, and the architecture that replaced it.

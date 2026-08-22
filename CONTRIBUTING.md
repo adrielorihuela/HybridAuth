@@ -1,4 +1,4 @@
-Thanks for taking the time to submit a contribution to HybridVelocity! Your support
+Thanks for taking the time to submit a contribution to HybridAuth! Your support
 is greatly appreciated.
 
 In this document, we'll give you some tips on making it more likely your
@@ -6,7 +6,7 @@ contribution will be pulled.
 
 # Where to contribute
 
-HybridVelocity is a fork of [Velocity](https://github.com/PaperMC/Velocity). If the change
+HybridAuth is a fork of [Velocity](https://github.com/PaperMC/Velocity). If the change
 you have in mind is not specific to this fork — a bug that also reproduces on upstream
 Velocity, or a general improvement — please send it to
 [PaperMC/Velocity](https://github.com/PaperMC/Velocity) instead, so everyone benefits and

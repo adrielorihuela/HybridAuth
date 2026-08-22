@@ -70,7 +70,7 @@ import org.apache.logging.log4j.Logger;
  * Implements the {@code /velocity} command and friends.
  */
 public final class VelocityCommand {
-  private static final String USAGE = "/hybridvelocity <%s>";
+  private static final String USAGE = "/hybridauth <%s>";
 
   @SuppressWarnings("checkstyle:MissingJavadocMethod")
   public static BrigadierCommand create(final VelocityServer server) {
@@ -102,7 +102,7 @@ public final class VelocityCommand {
     return new BrigadierCommand(
       commands.stream()
         .reduce(
-          BrigadierCommand.literalArgumentBuilder("hybridvelocity")
+          BrigadierCommand.literalArgumentBuilder("hybridauth")
             .executes(ctx -> {
               final CommandSource source = ctx.getSource();
               final String availableCommands = commands.stream()

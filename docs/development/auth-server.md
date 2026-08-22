@@ -1,6 +1,6 @@
 # The authentication server
 
-HybridVelocity bundles [NanoLimbo](https://github.com/Nan1t/NanoLimbo) (GPL-3.0, the same licence
+HybridAuth bundles [NanoLimbo](https://github.com/Nan1t/NanoLimbo) (GPL-3.0, the same licence
 this fork carries) as the holding area for players who have not authenticated yet. It runs
 **in-process** inside the proxy JVM — there is no second process to install, configure or monitor.
 
@@ -48,7 +48,7 @@ After pulling, re-apply any of the patches below that conflicted, bump `LIMBO_VE
 ## Local patches
 
 Kept deliberately small — every modified file inside `upstream/` is a potential merge conflict.
-Both patches are marked in the source with a `HybridVelocity patch:` comment.
+Both patches are marked in the source with a `HybridAuth patch:` comment.
 
 | File | Change | Why |
 | --- | --- | --- |
@@ -88,7 +88,7 @@ Two things are deliberately **not** patched:
 Declared against this repository's version catalog so a single version of everything resolves across
 the shaded jar. The versions line up closely with upstream's own:
 
-| Library | NanoLimbo 1.13.0 | HybridVelocity |
+| Library | NanoLimbo 1.13.0 | HybridAuth |
 | --- | --- | --- |
 | Netty | 4.2.15.Final | 4.2.16.Final |
 | Gson | 2.14.0 | 2.14.0 |

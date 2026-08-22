@@ -46,7 +46,7 @@ public final class ServerShortcutCommand {
    * Creates the shortcut command for the given server.
    *
    * <p>The command is available to every player unless a permissions plugin explicitly denies
-   * {@code hybridvelocity.command.server.<server name>}, matching how {@code /server} behaves. The
+   * {@code hybridauth.command.server.<server name>}, matching how {@code /server} behaves. The
    * pre-rename {@code velocity.} node is still honoured, so an existing deny keeps working.</p>
    *
    * @param proxy      the proxy the player will be moved on

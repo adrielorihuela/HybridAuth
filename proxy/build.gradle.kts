@@ -40,7 +40,7 @@ tasks {
     }
 
     jar {
-        // The thin jar: HybridVelocity-<forkVersion>-thin.jar. It is not runnable and exists only
+        // The thin jar: HybridAuth-<forkVersion>-thin.jar. It is not runnable and exists only
         // as an input to shadowJar; the classifier keeps it from being mistaken for the real one.
         archiveBaseName.set(forkName)
         archiveVersion.set(forkVersion)
@@ -51,13 +51,13 @@ tasks {
         manifest {
             attributes["Main-Class"] = "com.velocitypowered.proxy.bootstrap.Bootstrap"
             attributes["Implementation-Title"] = forkName
-            attributes["Implementation-Vendor"] = "HybridVelocity Contributors"
+            attributes["Implementation-Vendor"] = "HybridAuth Contributors"
             attributes["Multi-Release"] = "true"
         }
     }
 
     shadowJar {
-        // The runnable distributable: HybridVelocity-<forkVersion>.jar
+        // The runnable distributable: HybridAuth-<forkVersion>.jar
         archiveBaseName.set(forkName)
         archiveVersion.set(forkVersion)
         archiveClassifier.set("")
@@ -69,7 +69,7 @@ tasks {
         manifest {
             attributes["Main-Class"] = "com.velocitypowered.proxy.bootstrap.Bootstrap"
             attributes["Implementation-Title"] = forkName
-            attributes["Implementation-Vendor"] = "HybridVelocity Contributors"
+            attributes["Implementation-Vendor"] = "HybridAuth Contributors"
             attributes["Implementation-Version"] = forkVersion
         }
 

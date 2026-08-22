@@ -51,14 +51,14 @@ public final class Bootstrap {
   public static void main(final String[] args) throws Exception {
     final int running = featureVersion(System.getProperty("java.specification.version"));
     if (!isSupported(running)) {
-      System.err.println("HybridVelocity needs Java " + REQUIRED_JAVA
+      System.err.println("HybridAuth needs Java " + REQUIRED_JAVA
           + " or newer, but this is Java " + running + ".");
       System.err.println();
       System.err.println("Install a Java " + REQUIRED_JAVA
           + " runtime and start the proxy with it. If several are installed, point at the right");
       System.err.println("one directly, for example:");
       System.err.println("  /path/to/jdk-" + REQUIRED_JAVA + "/bin/java -jar "
-          + "HybridVelocity-<version>.jar");
+          + "HybridAuth-<version>.jar");
       System.exit(1);
       return;
     }

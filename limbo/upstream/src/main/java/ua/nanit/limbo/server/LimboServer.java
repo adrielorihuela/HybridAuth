@@ -46,7 +46,7 @@ public final class LimboServer {
 
     private CommandManager commandManager;
 
-    // HybridVelocity patch: when embedded inside the proxy there is no standalone process to own,
+    // HybridAuth patch: when embedded inside the proxy there is no standalone process to own,
     // so the interactive command manager (which reads System.in and would fight the proxy console),
     // the JVM shutdown hook and the explicit System.gc() are all skipped. Lifecycle is driven by
     // VelocityServer instead. See docs/limbo.md.
@@ -99,7 +99,7 @@ public final class LimboServer {
     }
 
     /**
-     * HybridVelocity patch: run without the standalone console, shutdown hook and System.gc(), with
+     * HybridAuth patch: run without the standalone console, shutdown hook and System.gc(), with
      * the bind address and forwarding supplied by the proxy rather than read from settings.yml.
      */
     public void startEmbedded(java.nio.file.Path workingDirectory, java.net.SocketAddress address,
@@ -138,7 +138,7 @@ public final class LimboServer {
         connections.getAllConnections().forEach(ClientConnection::sendKeepAlive);
     }
 
-    // HybridVelocity patch: was private; the proxy drives shutdown explicitly.
+    // HybridAuth patch: was private; the proxy drives shutdown explicitly.
     public void stop() {
         Log.info("Stopping server...");
 
