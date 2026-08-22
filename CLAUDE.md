@@ -66,6 +66,10 @@ works — as each piece is finished. Two reasons, and the second one is the impo
 So: `git commit`, then `git push`, every time. Do not batch them, and do not leave commits sitting
 unpushed while moving on to the next thing.
 
+**This includes updating this file.** A `/init` that is only on one disk has not been recorded at
+all, and this file is the first thing the next session reads. Rewriting it and stopping there is
+the one omission that costs the most, so `/init` always ends in a commit and a push.
+
 ## Commands
 
 The Gradle wrapper is the entry point; on Windows use `./gradlew.bat`. The build targets a
@@ -157,6 +161,19 @@ and encryption around it.
 Because everything runs on Netty event loops, blocking work must be dispatched off-loop
 (see `VelocityScheduler`), and code touching a connection must respect its event loop.
 
+### config-version belongs to upstream
+
+`config-version` counts **upstream Velocity's** migrations, and every upstream migration is gated
+on being *below* a number. This fork used to write `3.2` into it while upstream sat at `2.8`,
+which spends four numbers that are not ours: a Velocity release adding a migration at `2.9` would
+have found `3.2` already there and skipped it, silently, on every installation at once. Nothing
+fails; a setting simply never gets migrated.
+
+Fork migrations therefore count on **`hybridauth-config-version`**, and `OfflineAuthMigration`
+hands `config-version` back to upstream's value on any configuration still carrying the old
+number. When merging an upstream release, check whether it moved `config-version` in
+`default-velocity.toml` and follow it — that value is theirs to set.
+
 ### Renames, and the literals that must survive them
 
 The project has been renamed twice (`velocity` → `hybridvelocity` → `hybridauth`) and the
@@ -185,9 +202,15 @@ absent, and freshness falls back to the file name only where it has to.
 Several things here were established against the live APIs, not assumed, and are easy to undo by
 accident:
 
-- **Stable builds must be asked for explicitly.** Hangar needs `channel=Release` or it answers with
-  snapshots; Modrinth returns newest-first with the types mixed together, so `version_type` has to
-  be scanned for (`ViaBackwards` lists six betas before the first release).
+- **Stability is a ladder, not a filter.** Hangar and Modrinth are asked for Release, then Beta,
+  then Alpha, and the newest build of the first tier that has any is installed. Asking is required
+  — unfiltered, Hangar answers ViaVersion with `5.12.0-SNAPSHOT+1053` — and so is falling through:
+  Simple Voice Chat publishes thirteen Velocity builds and not one of them is a release. Stability
+  wins over recency, so it gets `2.5.28 (Beta)` rather than the newer `2.6.18` alpha. Anything
+  below Release carries its channel in the version string so it cannot read as stable in the log.
+- **GitHub downloads go through the API asset URL**, with the token and
+  `Accept: application/octet-stream`. `browser_download_url` answers 404 for a repository whose
+  owner GitHub has flagged — with or without a valid token — while the API serves it normally.
 - ***Up to date* is decided by the checksum, not the file name.** Hangar's version string and the
   version inside the file name differ (`5.12.0-SNAPSHOT+1053` ships
   `ViaVersion-5.12.0-SNAPSHOT.jar`). The same digest verifies the download.

@@ -118,10 +118,15 @@ On every start, before plugins are loaded, each one is downloaded if it is missi
 newer build exists. They are fetched all at once and start-up waits for the last of them, so the
 loader never sees a half-finished directory.
 
-**Only stable builds are used.** Every one of these publishes development builds too, and left
-unfiltered they are what you get: Hangar answers ViaVersion with `5.12.0-SNAPSHOT+1053` and
-Modrinth answers ViaBackwards with a beta. A proxy that moves itself onto a snapshot on its own is
-not what anybody wants, so it does not.
+**Stable builds first, and only as far down as it has to go.** Hangar and Modrinth are asked for
+a release, then a beta, then an alpha, and the newest build of the highest tier available is the
+one installed. Asking matters — unfiltered, Hangar answers ViaVersion with `5.12.0-SNAPSHOT+1053`
+— and so does falling through: Simple Voice Chat has thirteen Velocity builds and not one is a
+release, so refusing outright would mean you could not install a plugin that exists and works.
+
+Stability wins over recency, which is worth knowing before it surprises you: Simple Voice Chat
+installs `2.5.28 (beta)` rather than the newer `2.6.18`, because 2.6.18 is an alpha. Anything below
+a release carries its channel in the log, so a beta never reads as a stable build.
 
 Whether a plugin is current is decided by the checksum its source publishes, not by the file name,
 and that same checksum verifies the download, so a truncated file never reaches `plugins/`.
@@ -154,8 +159,12 @@ lists. Empty lists make no network requests at all.
 GitHub allows 60 unauthenticated requests an hour from one address. That is plenty for a few
 plugins and not enough for a machine that restarts constantly. A token raises it to 5000.
 
-Put it in `config/github.token`, one line and nothing else. The file does not exist until you
-create it.
+Put it in `config/github.token`, one line and nothing else. The file is created empty for you.
+
+A token is not only about the limit. **A repository belonging to an account GitHub has flagged, or
+any private repository, answers 404 on its normal download link — with or without a token.** The
+proxy fetches GitHub releases through the API instead, which serves them normally when a token is
+present, so listing your own repository works even in that state.
 
 ```toml
 [plugins]
