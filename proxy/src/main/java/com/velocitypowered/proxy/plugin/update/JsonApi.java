@@ -69,7 +69,9 @@ final class JsonApi {
         .header("Accept", "application/json")
         .timeout(TIMEOUT)
         .GET();
-    headers.forEach(request::header);
+    // setHeader, not header: the latter appends, so a caller overriding Accept would have sent
+    // both values.
+    headers.forEach(request::setHeader);
 
     final HttpResponse<String> response;
     try {

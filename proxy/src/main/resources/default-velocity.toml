@@ -95,14 +95,18 @@ server-name = "auth"
 # Set 0 to let the system pick a free port on each start.
 server-port = 30065
 
+[plugins]
 # Plugins the proxy keeps up to date by itself.
 #
 # On every start, before plugins are loaded, each plugin listed below is downloaded if it is
 # missing and updated if a newer build has been published. They are fetched all at once and
 # start-up waits for the last of them, so the loader never sees a half-finished directory.
 #
-# Only stable builds are used. Every source here also publishes snapshots, betas and development
-# builds, and the proxy will not move itself onto one of those on its own.
+# Stable builds only, wherever there is such a thing. Hangar, Modrinth and GitHub all publish
+# pre-release builds alongside the real ones, and only the stable channel is ever used -- the proxy
+# will not move itself onto a snapshot on its own. GeyserMC and LuckPerms are the exception, and
+# not by our choice: they publish continuous builds and have no release channel at all, so the
+# latest build is what everyone runs, including their own download pages.
 #
 # If a plugin cannot be downloaded and no jar of it is installed, the proxy refuses to start
 # rather than run without a plugin you asked for. If a jar is already there, it warns and keeps
@@ -113,7 +117,6 @@ server-port = 30065
 #
 # Plugins from anywhere else still work as always -- put the jar in plugins/ and leave it off
 # these lists. Empty lists make no network requests at all.
-[plugins]
 
 # Project names on hangar.papermc.io, as they appear in the project's URL. Case does not matter.
 hangar = [
