@@ -668,7 +668,8 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
     try {
       final String token = Files.readString(path).trim();
       if (token.isEmpty()) {
-        logger.warn("{} is empty; GitHub will be used without a token.", configured);
+        // The normal case: the proxy creates this file empty, and 60 requests an hour is enough
+        // for most people. Nothing to report.
         return null;
       }
       logger.info("Using the GitHub token from {}.", configured);

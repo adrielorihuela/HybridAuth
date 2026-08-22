@@ -220,7 +220,7 @@ public final class PluginUpdater {
 
   private void install(final String label, final PluginRelease release)
       throws PluginUpdateException, IOException {
-    final Path target = pluginDirectory.resolve(release.fileName());
+    final Path target = pluginDirectory.resolve(release.installedFileName());
     if (Files.exists(target) && isCurrent(target, release)) {
       // Still prune: an older jar dropped in by hand is not made harmless by us being up to date.
       // The plugin loader refuses the second one it sees for an id, and which of the two it reads
@@ -231,7 +231,7 @@ public final class PluginUpdater {
     }
 
     logger.info("Updating {} to {} from {}...", label, release.version(), release.source());
-    final Path part = pluginDirectory.resolve(release.fileName() + ".part");
+    final Path part = pluginDirectory.resolve(release.installedFileName() + ".part");
     try {
       download(release.downloadUrl(), part);
 
@@ -244,7 +244,7 @@ public final class PluginUpdater {
         }
       } else {
         logger.info("{} publishes no checksum, so {} could not be verified.",
-            release.source(), release.fileName());
+            release.source(), release.installedFileName());
       }
 
       // Only once the replacement is known good.

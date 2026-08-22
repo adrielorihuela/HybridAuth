@@ -583,6 +583,15 @@ public class VelocityConfiguration implements ProxyConfig {
       Files.writeString(defaultForwardingSecretPath, generateRandomString(12));
     }
 
+    // Created empty rather than left for somebody to discover from the documentation. A file that
+    // is there and blank invites being filled in; one that is only mentioned in a comment does not.
+    final Path githubTokenPath =
+        ConfigurationLocation.resolveConfigFile(PluginsConfig.GITHUB_TOKEN_FILE);
+    if (Files.notExists(githubTokenPath)) {
+      Files.createDirectories(githubTokenPath.toAbsolutePath().getParent());
+      Files.createFile(githubTokenPath);
+    }
+
     try (final CommentedFileConfig config = CommentedFileConfig.builder(path)
             .defaultData(defaultConfigLocation)
             .autosave()

@@ -131,6 +131,20 @@ github = [
     "ViaVersion/ViaRewind"
 ]
 
+# GitHub allows 60 unauthenticated requests an hour from one address, which is plenty for a few
+# plugins but not for a machine that restarts constantly. A token raises it to 5000, so if you add
+# several entries above and start hitting the limit, this is the answer.
+#
+# The file below is created empty for you. Put a token in it -- one line, nothing else -- and it
+# will be used. A fine-grained token with no permissions at all is enough, since this reads nothing
+# but public releases.
+#
+# It is a separate file for the same reason the forwarding secret is: configurations get pasted
+# into issues and screenshots, and a token in one is a credential handed to whoever reads it.
+#
+# A GITHUB_TOKEN environment variable is used instead when it is set.
+github-token-file = "github.token"
+
 # GeyserMC projects: "geyser" and "floodgate". They are on Hangar too, but only as a link
 # elsewhere with no version or checksum, so they are fetched from GeyserMC directly.
 geyser = [
@@ -141,18 +155,6 @@ geyser = [
 # LuckPerms is a switch rather than a list: there is only one, and on a proxy the platform is
 # always Velocity.
 luckperms = false
-
-# GitHub allows 60 unauthenticated requests an hour from one address, which is plenty for a few
-# plugins but not for a machine that restarts constantly. A token raises it to 5000.
-#
-# Put the token in this file -- one line, nothing else -- and it will be used. It does not exist
-# until you create it, and it is kept out of this file for the same reason the forwarding secret
-# is: configurations get pasted into issues and screenshots, and a token in one is a credential
-# handed to whoever reads it. A fine-grained token with no permissions at all is enough; this only
-# reads public releases.
-#
-# A GITHUB_TOKEN environment variable is used instead when it is set.
-github-token-file = "github.token"
 
 [packet-limiter]
 # Size of the moving time window in seconds used to calculate average rates.

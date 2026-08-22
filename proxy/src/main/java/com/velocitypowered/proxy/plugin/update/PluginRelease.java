@@ -47,6 +47,40 @@ public record PluginRelease(String source, String id, String version, String fil
   }
 
   /**
+   * The name this build is stored under, which carries a version whether the source put one there
+   * or not.
+   *
+   * <p>Most sources publish versioned names already. GeyserMC does not — every build of Geyser is
+   * {@code Geyser-Velocity.jar} — and while that costs nothing (freshness is decided by the
+   * checksum, not the name), a directory listing that cannot tell you which build is installed is
+   * worse than one that can.</p>
+   *
+   * <p>The test is whether the name has any digit in it at all, rather than whether it contains
+   * the version. The version is not always in the name it ships under: Hangar's build
+   * {@code 5.12.0-SNAPSHOT+1053} publishes {@code ViaVersion-5.12.0-SNAPSHOT.jar}, and looking for
+   * the version there would append it to a name that already says it.</p>
+   *
+   * @return the file name to install under
+   */
+  public String installedFileName() {
+    final String suffix = fileName.toLowerCase(Locale.ROOT).endsWith(".jar") ? ".jar" : "";
+    final String stem = fileName.substring(0, fileName.length() - suffix.length());
+    if (stem.chars().anyMatch(Character::isDigit)) {
+      return fileName;
+    }
+    return stem + "-" + safeFileName(version) + suffix;
+  }
+
+  /** Replaces what a version may contain and a file name may not. */
+  private static String safeFileName(final String version) {
+    final StringBuilder safe = new StringBuilder(version.length());
+    for (final char c : version.toCharArray()) {
+      safe.append(Character.isLetterOrDigit(c) || c == '.' || c == '-' || c == '_' ? c : '-');
+    }
+    return safe.toString();
+  }
+
+  /**
    * The name the plugin's jars go by on disk: the file name without its version suffix.
    *
    * <p>Derived from the file name rather than assembled from the version, because the two do not
