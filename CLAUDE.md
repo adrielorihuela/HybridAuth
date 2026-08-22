@@ -33,9 +33,9 @@ Fork-specific behaviour:
 - **Per-server shortcut commands** (`command/builtin/ServerShortcutCommand.java`, registered
   from `VelocityServer#registerServerCommands`) — the `comandos` list in `[servers]`.
   See `docs/guide/server-commands.md`.
-- **Plugin auto-update** (`plugin/update/`, `hangar` in `[plugins]`) — listed plugins are
-  downloaded and updated from Hangar in parallel, immediately before `loadPlugins()`.
-  See `docs/guide/getting-started.md`.
+- **Plugin auto-update** (`plugin/update/`, the `[plugins]` section) — listed plugins are
+  downloaded and updated in parallel from Hangar, Modrinth, GitHub, GeyserMC and LuckPerms,
+  immediately before `loadPlugins()`. See `docs/guide/getting-started.md`.
 
 The configuration is `config/proxy.toml` — named for what it configures, not for the proxy, so the
 next rename of the fork is not another migration. `ConfigurationLocation` owns that directory and
@@ -157,6 +157,19 @@ and encryption around it.
 Because everything runs on Netty event loops, blocking work must be dispatched off-loop
 (see `VelocityScheduler`), and code touching a connection must respect its event loop.
 
+### Renames, and the literals that must survive them
+
+The project has been renamed twice (`velocity` → `hybridvelocity` → `hybridauth`) and the
+configuration file three times. Both renames were done with a tree-wide search and replace, and
+**both times that quietly broke the compatibility they were supposed to preserve** by rewriting the
+old name inside the fallback list as well. Tests caught it; a person would not have.
+
+So: `LEGACY_PERMISSION_PREFIXES` in `BuiltinCommandUtil` and `PREVIOUS_NAMES` in
+`ConfigurationLocation` hold **string literals of names that no longer exist**. They are correct
+precisely because they are out of date, and a search and replace must never touch them. There are
+tests for both, and they are the only thing standing between a rename and somebody's granted
+permissions silently disappearing.
+
 ### Plugin auto-update
 
 `plugin/update/PluginUpdater` runs from `VelocityServer#start()` **immediately before
@@ -164,11 +177,25 @@ Because everything runs on Netty event loops, blocking work must be dispatched o
 already read the directory. `reloadConfiguration()` deliberately does not repeat it: plugins are
 not reloadable, so a newer jar there would only make the files disagree with what is running.
 
-Two things are load-bearing and were established against the live API, not assumed:
-`channel=Release` must be in the query or Hangar answers with snapshots, and *up to date* is
-decided by the published SHA-256 rather than the file name, because Hangar's version string and
-the version inside the file name are different (`5.12.0-SNAPSHOT+1053` ships
-`ViaVersion-5.12.0-SNAPSHOT.jar`). The same digest verifies the download.
+Each source is a `PluginSource` returning a `PluginRelease`, and they agree on almost nothing:
+Hangar, GitHub and GeyserMC publish SHA-256, Modrinth publishes SHA-512 and SHA-1 but not SHA-256,
+and LuckPerms publishes no checksum at all. So the checksum travels with its algorithm and may be
+absent, and freshness falls back to the file name only where it has to.
+
+Several things here were established against the live APIs, not assumed, and are easy to undo by
+accident:
+
+- **Stable builds must be asked for explicitly.** Hangar needs `channel=Release` or it answers with
+  snapshots; Modrinth returns newest-first with the types mixed together, so `version_type` has to
+  be scanned for (`ViaBackwards` lists six betas before the first release).
+- ***Up to date* is decided by the checksum, not the file name.** Hangar's version string and the
+  version inside the file name differ (`5.12.0-SNAPSHOT+1053` ships
+  `ViaVersion-5.12.0-SNAPSHOT.jar`). The same digest verifies the download.
+- **The updater builds its own `HttpClient`.** The proxy's follows no redirects and is shared with
+  Mojang session authentication; GeyserMC answers `builds/latest` with a 302 and GitHub's download
+  links point at another host.
+- **Geyser and Floodgate cannot come from Hangar.** Their entry there is an external link with
+  `fileInfo: null` and a version named "Geyser". `HangarSource` detects that shape and says so.
 
 Pruning older jars of a plugin runs on **both** paths, updated and already-current: two jars
 claiming one plugin id make the loader refuse whichever it reads second, and that was a real bug
