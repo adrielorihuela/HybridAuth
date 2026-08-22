@@ -220,8 +220,8 @@ public final class PluginUpdater {
 
   private void install(final String label, final PluginRelease release)
       throws PluginUpdateException, IOException {
-    final Path target = pluginDirectory.resolve(release.installedFileName());
-    if (Files.exists(target) && isCurrent(target, release)) {
+    final Path target = pluginDirectory.resolve(release.fileName());
+    if (Files.exists(target) && isCurrent(label, target, release)) {
       // Still prune: an older jar dropped in by hand is not made harmless by us being up to date.
       // The plugin loader refuses the second one it sees for an id, and which of the two it reads
       // first is not something anybody controls.
@@ -231,7 +231,7 @@ public final class PluginUpdater {
     }
 
     logger.info("Updating {} to {} from {}...", label, release.version(), release.source());
-    final Path part = pluginDirectory.resolve(release.installedFileName() + ".part");
+    final Path part = pluginDirectory.resolve(release.fileName() + ".part");
     try {
       download(release.downloadUrl(), part);
 
@@ -243,8 +243,8 @@ public final class PluginUpdater {
               + release.source() + " published for it, so it has been discarded");
         }
       } else {
-        logger.info("{} publishes no checksum, so {} could not be verified.",
-            release.source(), release.installedFileName());
+        logger.warn("{} publishes no checksum, so {} was installed unverified.",
+            release.source(), release.fileName());
       }
 
       // Only once the replacement is known good.
@@ -259,16 +259,24 @@ public final class PluginUpdater {
   /**
    * Whether the file already on disk is the release the source is offering.
    *
-   * <p>With a checksum this is exact. Without one — LuckPerms publishes none — the answer is that
-   * a file of that name is there, which is weaker but not meaningless: the version is part of the
-   * name, so a newer release asks for a different file.</p>
+   * <p>Answered by the digest and by nothing else, wherever the source publishes one. A matching
+   * file name proves only that something of that name is there — not that it is this build, not
+   * that it is intact, and not that it is what the source is serving today. Hangar, Modrinth,
+   * GitHub and GeyserMC all publish a digest, so for those the answer is exact.</p>
+   *
+   * <p>LuckPerms publishes none, anywhere, in any format. There the name is all there is, and it
+   * carries the build number the metadata named, so it is a weaker answer rather than a
+   * meaningless one — but it is a weaker answer, and the caller says so out loud.</p>
    */
-  private boolean isCurrent(final Path target, final PluginRelease release) throws IOException {
+  boolean isCurrent(final String label, final Path target, final PluginRelease release)
+      throws IOException {
     final PluginRelease.Checksum checksum = release.checksum();
-    if (checksum == null) {
-      return true;
+    if (checksum != null) {
+      return checksum.hex().equalsIgnoreCase(digestOf(target, checksum.algorithm()));
     }
-    return checksum.hex().equalsIgnoreCase(digestOf(target, checksum.algorithm()));
+    logger.warn("{} publishes no checksum, so {} is being kept on the strength of its name alone.",
+        release.source(), target.getFileName());
+    return true;
   }
 
   private void download(final String url, final Path destination)

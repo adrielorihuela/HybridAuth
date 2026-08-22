@@ -112,6 +112,12 @@ server-port = 30065
 # rather than run without a plugin you asked for. If a jar is already there, it warns and keeps
 # using the version you have, so an outage cannot take the proxy down.
 #
+# Whether a plugin needs updating is decided by the checksum its source publishes, never by the
+# file name. A name proves only that something of that name is there -- not that it is this build,
+# and not that it is intact. The same checksum verifies the download, so a corrupted file never
+# reaches this directory. LuckPerms is the one exception, because it publishes no checksum
+# anywhere, and it says so in the log when it falls back to the name.
+#
 # Older jars of the same plugin are deleted when a new one is installed, including any you put
 # there by hand: two jars claiming one plugin id make the loader refuse whichever it reads second.
 #

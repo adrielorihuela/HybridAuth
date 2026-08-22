@@ -17,57 +17,79 @@
 
 package com.velocitypowered.proxy.plugin.update;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.velocitypowered.proxy.plugin.update.PluginRelease.Checksum;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
-/** Which jars in plugins/ belong to which plugin, and what they get called. */
+/** Which jars in plugins/ belong to which plugin. */
 class PluginUpdaterTest {
 
-  private static PluginRelease release(final String version, final String fileName) {
-    return new PluginRelease("test", "id", version, fileName, null, "https://example.invalid");
+  @TempDir
+  Path dir;
+
+  private PluginRelease release(final Checksum checksum) {
+    return new PluginRelease("test", "id", "1.0", "Thing-1.0.jar", checksum,
+        "https://example.invalid");
+  }
+
+  /** The digest of "installed", so a test can state an expectation rather than compute one. */
+  private static final String INSTALLED_SHA256 =
+      "8b4b6b2a0b9d0f16b1f1c4b9bbf0c8a9e0f1b6ee39ba1d4e5b7b7c7e0ea3a1a5";
+
+  @Test
+  void matchingChecksumMeansUpToDate() throws IOException {
+    final Path jar = dir.resolve("Thing-1.0.jar");
+    Files.writeString(jar, "installed");
+    final String actual = digest(jar);
+
+    assertTrue(new PluginUpdater(dir, null)
+        .isCurrent("Thing", jar, release(new Checksum("SHA-256", actual))));
   }
 
   @Test
-  void versionedNameIsLeftAlone() {
-    assertEquals("ViaVersion-5.11.0.jar",
-        release("5.11.0", "ViaVersion-5.11.0.jar").installedFileName());
+  void differentChecksumMeansOutOfDateEvenThoughTheNameMatches() throws IOException {
+    // The whole point. The file is sitting there under exactly the name the source published, and
+    // that counts for nothing: a rebuild under the same name, or a corrupted file, is caught here
+    // and nowhere else.
+    final Path jar = dir.resolve("Thing-1.0.jar");
+    Files.writeString(jar, "something else entirely");
+
+    assertFalse(new PluginUpdater(dir, null)
+        .isCurrent("Thing", jar, release(new Checksum("SHA-256", INSTALLED_SHA256))));
   }
 
   @Test
-  void nameWithoutVersionGetsOne() {
-    // Every build of Geyser is published as the same file name. Nothing breaks without this --
-    // freshness comes from the checksum -- but a directory listing that cannot say which build is
-    // installed is worse than one that can.
-    assertEquals("Geyser-Velocity-2.11.2-1230.jar",
-        release("2.11.2-1230", "Geyser-Velocity.jar").installedFileName());
-    assertEquals("floodgate-velocity-2.2.5-140.jar",
-        release("2.2.5-140", "floodgate-velocity.jar").installedFileName());
+  void caseOfTheHexDigestDoesNotMatter() throws IOException {
+    final Path jar = dir.resolve("Thing-1.0.jar");
+    Files.writeString(jar, "installed");
+
+    assertTrue(new PluginUpdater(dir, null).isCurrent("Thing", jar,
+        release(new Checksum("SHA-256", digest(jar).toUpperCase(java.util.Locale.ROOT)))));
   }
 
   @Test
-  void nameThatSaysItsVersionDifferentlyIsLeftAlone() {
-    // The reason the test is "has a digit" rather than "contains the version": Hangar's build
-    // 5.12.0-SNAPSHOT+1053 ships this file, and appending would produce nonsense.
-    assertEquals("ViaVersion-5.12.0-SNAPSHOT.jar",
-        release("5.12.0-SNAPSHOT+1053", "ViaVersion-5.12.0-SNAPSHOT.jar").installedFileName());
+  void sourceWithoutChecksumFallsBackToTheName() throws IOException {
+    // LuckPerms, and only LuckPerms among the sources here. Kept because there is no alternative,
+    // not because the name is good enough.
+    final Path jar = dir.resolve("Thing-1.0.jar");
+    Files.writeString(jar, "anything at all");
+
+    assertTrue(new PluginUpdater(dir, null).isCurrent("Thing", jar, release(null)));
   }
 
-  @Test
-  void charactersNotAllowedInFileNamesAreReplaced() {
-    assertEquals("Thing-1.0-build-7.jar",
-        release("1.0+build/7", "Thing.jar").installedFileName());
-  }
-
-  @Test
-  void prunerStillRecognisesTheRenamedJar() {
-    // The rename would be a bug if the old Geyser-Velocity.jar survived alongside the new one.
-    final PluginRelease geyser = release("2.11.2-1230", "Geyser-Velocity.jar");
-
-    assertTrue(PluginUpdater.isJarOf(geyser.baseName(), "Geyser-Velocity.jar"));
-    assertTrue(PluginUpdater.isJarOf(geyser.baseName(), geyser.installedFileName()));
+  private static String digest(final Path path) throws IOException {
+    try {
+      final java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+      return java.util.HexFormat.of().formatHex(md.digest(Files.readAllBytes(path)));
+    } catch (java.security.NoSuchAlgorithmException e) {
+      throw new AssertionError(e);
+    }
   }
 
   @Test
