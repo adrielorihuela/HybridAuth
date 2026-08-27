@@ -3,6 +3,10 @@
 Everything this fork adds on top of upstream [Velocity](https://docs.papermc.io/velocity). Anything
 not covered here behaves exactly as it does upstream, so the Velocity documentation still applies.
 
+The two things it adds are an authentication layer for proxies running in offline mode — a mode
+Velocity already supports, made stricter rather than looser — and an automatic plugin updater.
+Verification of premium players by Mojang is untouched.
+
 ## [guide/](guide/) — using the proxy
 
 Start here if you want to run it.

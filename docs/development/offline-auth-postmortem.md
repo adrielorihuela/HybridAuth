@@ -123,7 +123,7 @@ disconnect cause that was never reached because the registry error fired first.
 
 ### 6. `PostLoginEvent` was skipped
 
-Both gated branches bypassed `PostLoginEvent`. That breaks every plugin that relies on it, and it
+Both gated branches skipped `PostLoginEvent`. That breaks every plugin that relies on it, and it
 is a design defect independent of the protocol bugs. Whatever gate replaces this must still fire
 it.
 
@@ -148,7 +148,7 @@ The authentication core is reusable, but these must be fixed before it is:
 | bcrypt hashing runs on the Netty event loop (`PasswordUtil` called synchronously from the packet handler) | Blocks the event loop for every login; the codebase's own rule is that blocking work is dispatched off-loop |
 | `AuthDatabase.getPasswordRecord` swallows `SQLException` and returns `null` | "database is broken" is indistinguishable from "not registered", so a failing database offers `/register` to an already-registered player and lets their account be overwritten |
 | Database path is `Path.of("player_auth.db")` | Relative to the working directory instead of the proxy data directory |
-| `/changepassword` implemented as a raw string prefix match in `ClientPlaySessionHandler` | Bypasses the command system entirely: no permissions, no tab completion, no `CommandExecuteEvent` |
+| `/changepassword` implemented as a raw string prefix match in `ClientPlaySessionHandler` | Skips the command system entirely: no permissions, no tab completion, no `CommandExecuteEvent` |
 | `ConnectedPlayer.teardown()` widened from package-private to `public` | Unnecessary API surface; `teardown()` is at `ConnectedPlayer.java:938` on `main` and should stay package-private |
 | `connectToInitialServer` logic duplicated inside the auth handler | Two copies of the initial-server selection rules that will drift |
 

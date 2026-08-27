@@ -2,7 +2,11 @@
 
 An online-mode Velocity proxy disconnects any player that Mojang's session server does not
 recognise, with the `velocity.error.online-mode-only` message. HybridAuth accepts those
-players instead, giving them an offline identity that cannot collide with a premium one.
+players instead, giving them an offline identity that cannot collide with a verified one.
+
+The separation is the point. A dot is not valid in a Minecraft account name, so a dotted username
+is one no paid account can ever hold — which is what makes it impossible for an unverified player
+to be mistaken for, or to impersonate, a player Mojang has verified.
 
 ## Login flow
 

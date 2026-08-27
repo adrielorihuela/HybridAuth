@@ -4,6 +4,13 @@ HybridAuth requires players that Mojang cannot authenticate to register a passwo
 before they reach any of your servers. They wait on an authentication server that runs **inside the
 proxy** — there is no extra server to install, configure or monitor.
 
+Velocity already supports running with `online-mode = false`, where any client can claim any
+username with no password. This is a layer on top of that mode, and it is strictly more restrictive
+than the setting it replaces: unverified players must hold a password, they cannot reach a server
+before proving it, and they cannot take the name of a player Mojang has verified. **Nothing about
+how Mojang verifies premium players is changed, skipped or worked around** — that path is untouched
+upstream Velocity code.
+
 This is **on by default**. Updating an existing installation turns it on.
 
 Premium players are unaffected: they connect exactly as they do on stock Velocity. **Neither are
