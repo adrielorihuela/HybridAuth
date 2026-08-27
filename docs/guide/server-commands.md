@@ -6,7 +6,7 @@ HybridAuth can create a command for each of your servers, so that a player can t
 ## Configuration
 
 The servers that get a command are listed in the `comandos` option, inside the `[servers]`
-section of `config/proxy.toml`:
+section of `config/HybridAuth.toml`:
 
 ```toml
 [servers]

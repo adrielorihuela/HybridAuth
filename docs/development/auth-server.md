@@ -71,7 +71,7 @@ waiting screen. The Overworld would show a moving sky and give it away.
 `bind` and `infoForwarding` are deliberately absent from that file. Binding anywhere but loopback
 would expose an unauthenticated world to the network, and a forwarding mode that disagrees with the
 proxy's breaks the handshake, so neither is the operator's to set. The proxy passes both to
-`LimboServer` in code, from `config/proxy.toml`, and they never appear on disk at all.
+`LimboServer` in code, from `config/HybridAuth.toml`, and they never appear on disk at all.
 
 Two things are deliberately **not** patched:
 

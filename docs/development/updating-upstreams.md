@@ -72,9 +72,17 @@ git fetch upstream
 git merge upstream/dev/4.0.0
 ```
 
-Done once already, at `00759e52` → `4772ca30` (five commits). The only conflict was
-`gradle/libs.versions.toml`, in two hunks of the same shape: upstream's version bumps against the
-fork's added dependencies. Resolving it means keeping both sides. Expect that shape again.
+Done twice so far, and both times the conflict was the same *shape* in a different file:
+
+| Merge | Conflict | What it was |
+| --- | --- | --- |
+| `00759e52` → `4772ca30`, five commits | `gradle/libs.versions.toml`, two hunks | Upstream's version bumps against the fork's added dependencies |
+| → `db0a17ee`, four commits (Velocity 4.1.1) | `gradle.properties` | Upstream setting `version` against the fork's `forkName`/`forkVersion` block below it |
+
+Both resolve the same way: **keep both sides**. `version` is upstream's to set and the fork follows
+it; `forkName` and `forkVersion` are ours and upstream knows nothing about them. Expect that shape
+again — the conflicts here are almost never about logic, they are two projects editing adjacent
+lines of the same file.
 
 `dev/4.0.0` is upstream's default branch and the one this fork is based on. `dev/5.0.0` exists and
 is a different major line — do not merge it without deciding that deliberately.

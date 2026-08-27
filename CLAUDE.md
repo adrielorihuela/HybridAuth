@@ -37,13 +37,16 @@ Fork-specific behaviour:
   downloaded and updated in parallel from Hangar, Modrinth, GitHub, GeyserMC and LuckPerms,
   immediately before `loadPlugins()`. See `docs/guide/getting-started.md`.
 
-The configuration is `config/proxy.toml` — named for what it configures, not for the proxy, so the
-next rename of the fork is not another migration. `ConfigurationLocation` owns that directory and
-moves any earlier name into place on first start (`hybridauth.toml`, upstream's
-`velocity.toml`, in `config/` or in the proxy root), along with `forwarding.secret`. The secret is **moved and
-never regenerated** — a fresh one is accepted by the proxy and rejected by every backend on modern
-forwarding, with no error anywhere to explain it. Permission nodes keep the `velocity.` prefix —
-they are identifiers operators have already granted, not branding.
+The configuration is `config/HybridAuth.toml`. `ConfigurationLocation` owns that directory and
+moves any earlier name into place on first start — `proxy.toml`, `hybridvelocity.toml` and
+upstream's `velocity.toml`, in `config/` or in the proxy root — along with `forwarding.secret`. The
+secret is **moved and never regenerated**: a fresh one is accepted by the proxy and rejected by
+every backend on modern forwarding, with no error anywhere to explain it. The `.toml` extension is
+load-bearing, since night-config picks its parser from it.
+
+Permission nodes are `hybridauth.command.*`, and every prefix the project has used is still read as
+a fallback. See **Renames, and the literals that must survive them** below — that fallback has been
+broken twice by search-and-replace.
 
 Keep diffs against upstream narrow so upstream merges stay manageable.
 
@@ -109,7 +112,7 @@ reasoning is in `docs/development/updating-upstreams.md`.
 ./gradlew :velocity-proxy:runShadow
 ```
 
-Run the proxy locally; it generates `config/proxy.toml`, `config/forwarding.secret` and
+Run the proxy locally; it generates `config/HybridAuth.toml`, `config/forwarding.secret` and
 `lang/` in `proxy/run/`. The build produces two jars in `proxy/build/libs/`:
 `HybridAuth-<forkVersion>.jar` is the runnable distributable and the one to attach to a
 release; `HybridAuth-<forkVersion>-thin.jar` is not runnable and only feeds `shadowJar`.
@@ -118,7 +121,7 @@ release; `HybridAuth-<forkVersion>-thin.jar` is not runnable and only feeds `sha
 
 Two versions coexist, and they are not interchangeable:
 
-- `version` in `gradle.properties` (`4.1.0-SNAPSHOT`) is the **upstream Velocity API version**.
+- `version` in `gradle.properties` (`4.1.1`) is the **upstream Velocity API version**.
   It sets the Maven coordinates of `velocity-api`, so plugins compile against it — do not bump
   it to express a fork release.
 - `forkName` / `forkVersion` in `gradle.properties` name the **fork's distributable**. The
@@ -235,7 +238,7 @@ server shortcut commands) must be registered after the server-registration loop.
 `reloadConfiguration()` is the mirror image for `/hybridauth reload` and must be updated
 whenever startup gains configuration-derived state.
 
-`VelocityConfiguration` deserializes `config/proxy.toml` with night-config, using
+`VelocityConfiguration` deserializes `config/HybridAuth.toml` with night-config, using
 `proxy/src/main/resources/default-velocity.toml` as the template written on first run.
 Sub-tables (`[servers]`, `[forced-hosts]`, `[advanced]`, …) map to private static inner
 classes. `validate()` is the place for cross-checks between sections, and

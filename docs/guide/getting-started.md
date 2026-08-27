@@ -39,15 +39,16 @@ On first start it creates:
 
 | | |
 | --- | --- |
-| `config/proxy.toml` | The configuration. |
+| `config/HybridAuth.toml` | The configuration. |
 | `config/forwarding.secret` | The shared secret for modern player-info forwarding. |
 | `plugins/` | Plugins, including the ones listed under `[plugins]`. |
 | `lang/` | Message files. This copy wins over the ones inside the jar, so edit here to change wording. |
 | `auth/` | The authentication server's settings and the password database. |
 
 If you are upgrading, put the jar in place and start it. Anything from an older layout is moved
-into `config/` for you, contents intact — a stock Velocity `velocity.toml` becomes
-`config/proxy.toml`, and an existing `forwarding.secret` is **moved, never regenerated**.
+into `config/` for you, contents intact. A stock Velocity `velocity.toml`, or this fork's earlier
+`hybridvelocity.toml` or `proxy.toml`, all become `config/HybridAuth.toml`, and an existing
+`forwarding.secret` is **moved, never regenerated**.
 That last part matters: a new secret would be accepted silently by the proxy and rejected by every
 backend using modern forwarding.
 
