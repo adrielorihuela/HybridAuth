@@ -117,7 +117,7 @@ Download `HybridAuth-<version>.jar` from the
 [releases](https://github.com/adrielorihuela/HybridAuth/releases) and run it:
 
 ```bash
-java -Xms512M -Xmx512M -jar HybridAuth-1.2.0.jar
+java -Xms512M -Xmx512M -jar HybridAuth-1.2.1.jar
 ```
 
 Java 25 is required.
