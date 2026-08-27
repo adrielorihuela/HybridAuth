@@ -68,7 +68,7 @@ hand.
 ## Updating Velocity — merge, do not rebase
 
 ```bash
-git fetch upstream
+git fetch --no-tags upstream
 git merge upstream/dev/4.0.0
 ```
 
@@ -141,12 +141,25 @@ Watch for these specifically, because a Velocity update can silently break them:
 ## Updating the authentication server
 
 ```bash
-git fetch limbo-upstream
+git fetch --no-tags limbo-upstream
 git subtree pull --prefix=limbo/upstream limbo-upstream main --squash
 ```
 
 `--squash` and the `--prefix` must match exactly what the original import used, or the trailers will
 not line up.
+
+**`--no-tags` is not optional.** NanoLimbo numbers its releases the same way this fork does, and a
+plain `git fetch` brings all of its tags into this repository — twenty-two of them the first time,
+including a `v1.2.1` that collided with this fork's own release tag. The collision is not loud: the
+local tag simply points at a NanoLimbo commit, so the next release either refuses to tag or pushes
+somebody else's commit under our version number. If it has already happened, the foreign tags are
+the ones local-only:
+
+```bash
+comm -23 <(git tag | sort) <(git ls-remote --tags origin | grep -v "\^{}" | sed "s|.*refs/tags/||" | sort)
+```
+
+`./gradlew updateAuthServer` passes `--no-tags` for you.
 
 ### Re-apply the local patches
 

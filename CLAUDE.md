@@ -103,7 +103,9 @@ Apply formatting — run before committing, the build fails on style violations.
 
 Update both upstreams: adds the `upstream` and `limbo-upstream` remotes if a clone is missing them,
 merges Velocity, pulls the NanoLimbo subtree with the flags it requires, and prints what to check
-afterwards. It refuses to run on a dirty tree, mid-merge, or off `main`, leaves a conflicted merge
+afterwards. Both fetches pass `--no-tags`, which is load-bearing: NanoLimbo numbers its releases
+the way this fork does, and a plain fetch imported twenty-two of its tags including a `v1.2.1` that
+collided with a release tag here. It refuses to run on a dirty tree, mid-merge, or off `main`, leaves a conflicted merge
 in progress rather than aborting it, and never pushes. `addUpstreams`, `updateVelocity` and
 `updateAuthServer` are the individual steps. Defined in `gradle/upstreams.gradle.kts`; the
 reasoning is in `docs/development/updating-upstreams.md`.

@@ -114,7 +114,8 @@ tasks.register("updateVelocity") {
   dependsOn("addUpstreams")
   doLast {
     preflight()
-    run("fetch", velocityRemote)
+    // --no-tags, always. See updateAuthServer for what fetching an upstream's tags costs.
+    run("fetch", "--no-tags", velocityRemote)
 
     val target = velocityRemote + "/" + velocityBranch
     val incoming = gitOutput("rev-list", "--count", "HEAD.." + target)
@@ -149,7 +150,11 @@ tasks.register("updateAuthServer") {
   dependsOn("addUpstreams")
   doLast {
     preflight()
-    run("fetch", limboRemote)
+    // --no-tags is not optional here. NanoLimbo publishes tags in the same shape this fork uses,
+    // and a plain fetch drops all of them into this repository -- twenty-two of them, one being a
+    // v1.2.1 that collided with this fork's own release tag. Left alone, the next release either
+    // fails to tag or, worse, pushes somebody else's commit under our version number.
+    run("fetch", "--no-tags", limboRemote)
 
     // --prefix and --squash must match the original import exactly. 'git subtree pull' finds the
     // previous import by searching history for the git-subtree-dir/git-subtree-split trailers it
