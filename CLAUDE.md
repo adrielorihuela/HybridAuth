@@ -33,6 +33,10 @@ Fork-specific behaviour:
 - **Per-server shortcut commands** (`command/builtin/ServerShortcutCommand.java`, registered
   from `VelocityServer#registerServerCommands`) — the `comandos` list in `[servers]`.
   See `docs/guide/server-commands.md`.
+- **Portal redirects** (`BackendPlaySessionHandler#handle(RespawnPacket)`, the `[portales]`
+  section) — a backend moving a player into the Nether or the End sends them to the configured
+  server instead. The respawn packet is still forwarded, so a failed connection leaves the player
+  consistent on the origin. See `docs/guide/portal-redirects.md`.
 - **Plugin auto-update** (`plugin/update/`, the `[plugins]` section) — listed plugins are
   downloaded and updated in parallel from Hangar, Modrinth, GitHub, GeyserMC and LuckPerms,
   immediately before `loadPlugins()`. See `docs/guide/getting-started.md`.
