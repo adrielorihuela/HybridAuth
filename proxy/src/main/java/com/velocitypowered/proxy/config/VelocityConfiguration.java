@@ -44,6 +44,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.SecureRandom;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -103,6 +104,8 @@ public class VelocityConfiguration implements ProxyConfig {
   private OfflineAuthConfig offlineAuthConfig = OfflineAuthConfig.DEFAULT;
   @Expose
   private PluginsConfig pluginsConfig = PluginsConfig.DEFAULT;
+  @Expose
+  private PortalsConfig portalsConfig = PortalsConfig.DEFAULT;
 
   private VelocityConfiguration(Servers servers, ForcedHosts forcedHosts, Advanced advanced,
       Query query, Metrics metrics) {
@@ -120,7 +123,8 @@ public class VelocityConfiguration implements ProxyConfig {
       boolean samplePlayersInPing, boolean enablePlayerAddressLogging, Servers servers,
       ForcedHosts forcedHosts, Advanced advanced, Query query, Metrics metrics,
       boolean forceKeyAuthentication, PacketLimiterConfig packetLimiterConfig,
-      OfflineAuthConfig offlineAuthConfig, PluginsConfig pluginsConfig) {
+      OfflineAuthConfig offlineAuthConfig, PluginsConfig pluginsConfig,
+      PortalsConfig portalsConfig) {
     this.bind = bind;
     this.motd = motd;
     this.showMaxPlayers = showMaxPlayers;
@@ -142,6 +146,7 @@ public class VelocityConfiguration implements ProxyConfig {
     this.packetLimiterConfig = packetLimiterConfig;
     this.offlineAuthConfig = offlineAuthConfig;
     this.pluginsConfig = pluginsConfig;
+    this.portalsConfig = portalsConfig;
   }
 
   /**
@@ -211,6 +216,24 @@ public class VelocityConfiguration implements ProxyConfig {
         logger.error("Server command '{}' has no matching server in [servers]. Add it there, or "
             + "remove it from 'comandos'.", s);
         valid = false;
+      }
+    }
+
+    for (Map.Entry<String, Map<PortalsConfig.Dimension, String>> origin
+        : portalsConfig.redirects().entrySet()) {
+      if (servers.getServers().keySet().stream().noneMatch(origin.getKey()::equalsIgnoreCase)) {
+        logger.error("[portales] '{}' has no matching server in [servers].", origin.getKey());
+        valid = false;
+      }
+      for (String target : origin.getValue().values()) {
+        if (servers.getServers().keySet().stream().noneMatch(target::equalsIgnoreCase)) {
+          logger.error("[portales] '{}' sends players to '{}', which has no matching server in "
+              + "[servers].", origin.getKey(), target);
+          valid = false;
+        } else if (target.equalsIgnoreCase(origin.getKey())) {
+          logger.error("[portales] '{}' sends players to itself.", origin.getKey());
+          valid = false;
+        }
       }
     }
 
@@ -396,6 +419,16 @@ public class VelocityConfiguration implements ProxyConfig {
     return pluginsConfig;
   }
 
+  /**
+   * Returns which servers send players elsewhere through their portals, from the
+   * {@code [portales]} section.
+   *
+   * @return the portal redirect configuration
+   */
+  public PortalsConfig getPortalsConfig() {
+    return portalsConfig;
+  }
+
   @Override
   public Map<String, List<String>> getForcedHosts() {
     return forcedHosts.getForcedHosts();
@@ -549,6 +582,7 @@ public class VelocityConfiguration implements ProxyConfig {
         .add("packetLimiterConfig", packetLimiterConfig)
         .add("offlineAuthConfig", offlineAuthConfig)
         .add("pluginsConfig", pluginsConfig)
+        .add("portalsConfig", portalsConfig)
         .toString();
   }
 
@@ -652,6 +686,7 @@ public class VelocityConfiguration implements ProxyConfig {
       final OfflineAuthConfig offlineAuthConfig =
               OfflineAuthConfig.fromConfig(config.get("offline-auth"));
       final PluginsConfig pluginsConfig = PluginsConfig.fromConfig(config.get("plugins"));
+      final PortalsConfig portalsConfig = PortalsConfig.fromConfig(config.get("portales"));
       final PlayerInfoForwarding forwardingMode = config.getEnumOrElse(
               "player-info-forwarding-mode", PlayerInfoForwarding.NONE);
       final PingPassthroughMode pingPassthroughMode = config.getEnumOrElse("ping-passthrough",
@@ -700,7 +735,8 @@ public class VelocityConfiguration implements ProxyConfig {
               forceKeyAuthentication,
               packetLimiterConfig,
               offlineAuthConfig,
-              pluginsConfig
+              pluginsConfig,
+              portalsConfig
       );
     }
   }
@@ -798,7 +834,7 @@ public class VelocityConfiguration implements ProxyConfig {
      * @param name the server name to clean
      * @return the cleaned server name
      */
-    private String cleanServerName(String name) {
+    private static String cleanServerName(String name) {
       return name.replace("\"", "");
     }
 
@@ -1181,6 +1217,72 @@ public class VelocityConfiguration implements ProxyConfig {
           .map(String::trim)
           .filter(name -> !name.isEmpty())
           .toList();
+    }
+  }
+
+  /**
+   * Servers whose Nether and End portals send players to another server instead. Keys are the
+   * origin server names, lowercased; a missing section redirects nothing.
+   *
+   * @param redirects the target server for each dimension, per origin server
+   */
+  public record PortalsConfig(Map<String, Map<Dimension, String>> redirects) {
+
+    public static final PortalsConfig DEFAULT = new PortalsConfig(Map.of());
+
+    /** The dimensions a portal can lead to. */
+    public enum Dimension {
+      NETHER("nether"),
+      END("end");
+
+      private final String key;
+
+      Dimension(final String key) {
+        this.key = key;
+      }
+    }
+
+    /**
+     * Returns a PortalsConfig from a config section, or the default if the section is null.
+     *
+     * @param config the configuration section to parse
+     * @return the portals config, or the default if {@code config} is null
+     */
+    public static PortalsConfig fromConfig(CommentedConfig config) {
+      if (config == null) {
+        return DEFAULT;
+      }
+      final Map<String, Map<Dimension, String>> redirects = new HashMap<>();
+      for (UnmodifiableConfig.Entry entry : config.entrySet()) {
+        if (!(entry.getValue() instanceof UnmodifiableConfig targets)) {
+          throw new IllegalArgumentException("[portales] entry " + entry.getKey()
+              + " must be a table, like { nether = \"survival\", end = \"survival\" }");
+        }
+        final Map<Dimension, String> byDimension = new EnumMap<>(Dimension.class);
+        for (Dimension dimension : Dimension.values()) {
+          final Object target = targets.get(dimension.key);
+          if (target instanceof String name && !name.isBlank()) {
+            byDimension.put(dimension, Servers.cleanServerName(name.trim()));
+          }
+        }
+        if (!byDimension.isEmpty()) {
+          redirects.put(Servers.cleanServerName(entry.getKey()).toLowerCase(Locale.ROOT),
+              Map.copyOf(byDimension));
+        }
+      }
+      return new PortalsConfig(Map.copyOf(redirects));
+    }
+
+    /**
+     * Returns the server a portal on {@code origin} leading to {@code dimension} sends players to.
+     *
+     * @param origin the server the player is on
+     * @param dimension the dimension the portal leads to
+     * @return the target server name, if one is configured
+     */
+    public Optional<String> target(final String origin, final Dimension dimension) {
+      final Map<Dimension, String> targets = redirects.get(origin.toLowerCase(Locale.ROOT));
+      return targets == null ? Optional.empty() : Optional.ofNullable(targets.get(dimension));
     }
   }
 
