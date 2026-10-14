@@ -121,6 +121,10 @@ public class RespawnPacket implements MinecraftPacket {
     this.dataToKeep = dataToKeep;
   }
 
+  public DimensionInfo getDimensionInfo() {
+    return dimensionInfo;
+  }
+
   public short getPreviousGamemode() {
     return previousGamemode;
   }

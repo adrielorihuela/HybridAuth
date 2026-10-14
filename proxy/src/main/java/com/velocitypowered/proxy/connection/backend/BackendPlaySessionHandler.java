@@ -37,11 +37,13 @@ import com.velocitypowered.api.proxy.messages.ChannelIdentifier;
 import com.velocitypowered.api.proxy.player.ResourcePackInfo;
 import com.velocitypowered.proxy.VelocityServer;
 import com.velocitypowered.proxy.command.CommandGraphInjector;
+import com.velocitypowered.proxy.config.VelocityConfiguration.PortalsConfig.Dimension;
 import com.velocitypowered.proxy.connection.MinecraftConnection;
 import com.velocitypowered.proxy.connection.MinecraftSessionHandler;
 import com.velocitypowered.proxy.connection.client.ClientPlaySessionHandler;
 import com.velocitypowered.proxy.connection.client.ConnectedPlayer;
 import com.velocitypowered.proxy.connection.player.resourcepack.VelocityResourcePackInfo;
+import com.velocitypowered.proxy.connection.registry.DimensionInfo;
 import com.velocitypowered.proxy.connection.player.resourcepack.handler.ResourcePackHandler;
 import com.velocitypowered.proxy.connection.util.ConnectionMessages;
 import com.velocitypowered.proxy.protocol.MinecraftPacket;
@@ -58,6 +60,7 @@ import com.velocitypowered.proxy.protocol.packet.DisconnectPacket;
 import com.velocitypowered.proxy.protocol.packet.KeepAlivePacket;
 import com.velocitypowered.proxy.protocol.packet.LegacyPlayerListItemPacket;
 import com.velocitypowered.proxy.protocol.packet.PluginMessagePacket;
+import com.velocitypowered.proxy.protocol.packet.RespawnPacket;
 import com.velocitypowered.proxy.protocol.packet.RemovePlayerInfoPacket;
 import com.velocitypowered.proxy.protocol.packet.RemoveResourcePackPacket;
 import com.velocitypowered.proxy.protocol.packet.ResourcePackRequestPacket;
@@ -76,10 +79,12 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.handler.timeout.ReadTimeoutException;
 import java.net.InetSocketAddress;
+import java.util.Locale;
 import java.util.regex.Pattern;
 import net.kyori.adventure.key.Key;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * Handles a connected player.
@@ -100,6 +105,7 @@ public class BackendPlaySessionHandler implements MinecraftSessionHandler {
   private final MinecraftConnection playerConnection;
   private final BungeeCordMessageResponder bungeecordMessageResponder;
   private boolean exceptionTriggered = false;
+  private boolean portalRedirected = false;
   private int packetsFlushed;
 
   BackendPlaySessionHandler(VelocityServer server, VelocityServerConnection serverConn) {
@@ -393,6 +399,55 @@ public class BackendPlaySessionHandler implements MinecraftSessionHandler {
                 pingEvent.getPing().getFavicon().orElse(null), packet.isSecureChatEnforced())),
         playerConnection.eventLoop());
     return true;
+  }
+
+  @Override
+  public boolean handle(RespawnPacket packet) {
+    // A backend has no way to tell the proxy that a player stepped into a portal, but it does have
+    // to tell the client that its dimension changed, and that is what [portales] keys on. The
+    // packet is still forwarded: if the target server cannot be reached, the player is left
+    // consistently in this server's Nether or End rather than out of step with it.
+    final Dimension dimension = portalDimension(packet);
+    if (dimension != null && !portalRedirected) {
+      final ConnectedPlayer player = serverConn.getPlayer();
+      server.getConfiguration().getPortalsConfig()
+          .target(serverConn.getServerInfo().getName(), dimension)
+          .flatMap(server::getServer)
+          .filter(target -> player.getConnectionInFlight() == null)
+          .ifPresent(target -> {
+            portalRedirected = true;
+            player.createConnectionRequest(target).fireAndForget();
+          });
+    }
+    return false;
+  }
+
+  /**
+   * Returns the dimension a respawn moves the player into, if it is the Nether or the End.
+   *
+   * <p>From 1.16 the world is named by key, in the level name or, on 1.16.2 to 1.18.2, in the
+   * slot the dimension type uses elsewhere. Worlds created by plugins such as Multiverse are named
+   * after the world, so {@code lobby_nether} counts as well as {@code minecraft:the_nether}. Before
+   * 1.16 the dimension is a number.
+   */
+  static @Nullable Dimension portalDimension(final RespawnPacket packet) {
+    final DimensionInfo info = packet.getDimensionInfo();
+    if (info == null) {
+      return switch (packet.getDimension()) {
+        case -1 -> Dimension.NETHER;
+        case 1 -> Dimension.END;
+        default -> null;
+      };
+    }
+    final String key = (info.getLevelName() != null ? info.getLevelName()
+        : info.getRegistryIdentifier()).toLowerCase(Locale.ROOT);
+    if (key.equals("minecraft:the_nether") || key.endsWith("_nether")) {
+      return Dimension.NETHER;
+    }
+    if (key.equals("minecraft:the_end") || key.endsWith("_the_end")) {
+      return Dimension.END;
+    }
+    return null;
   }
 
   @Override
