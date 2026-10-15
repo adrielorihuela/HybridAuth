@@ -43,8 +43,8 @@ import com.velocitypowered.proxy.connection.MinecraftSessionHandler;
 import com.velocitypowered.proxy.connection.client.ClientPlaySessionHandler;
 import com.velocitypowered.proxy.connection.client.ConnectedPlayer;
 import com.velocitypowered.proxy.connection.player.resourcepack.VelocityResourcePackInfo;
-import com.velocitypowered.proxy.connection.registry.DimensionInfo;
 import com.velocitypowered.proxy.connection.player.resourcepack.handler.ResourcePackHandler;
+import com.velocitypowered.proxy.connection.registry.DimensionInfo;
 import com.velocitypowered.proxy.connection.util.ConnectionMessages;
 import com.velocitypowered.proxy.protocol.MinecraftPacket;
 import com.velocitypowered.proxy.protocol.StateRegistry;
@@ -60,11 +60,11 @@ import com.velocitypowered.proxy.protocol.packet.DisconnectPacket;
 import com.velocitypowered.proxy.protocol.packet.KeepAlivePacket;
 import com.velocitypowered.proxy.protocol.packet.LegacyPlayerListItemPacket;
 import com.velocitypowered.proxy.protocol.packet.PluginMessagePacket;
-import com.velocitypowered.proxy.protocol.packet.RespawnPacket;
 import com.velocitypowered.proxy.protocol.packet.RemovePlayerInfoPacket;
 import com.velocitypowered.proxy.protocol.packet.RemoveResourcePackPacket;
 import com.velocitypowered.proxy.protocol.packet.ResourcePackRequestPacket;
 import com.velocitypowered.proxy.protocol.packet.ResourcePackResponsePacket;
+import com.velocitypowered.proxy.protocol.packet.RespawnPacket;
 import com.velocitypowered.proxy.protocol.packet.ServerDataPacket;
 import com.velocitypowered.proxy.protocol.packet.TabCompleteResponsePacket;
 import com.velocitypowered.proxy.protocol.packet.TransferPacket;
@@ -422,34 +422,6 @@ public class BackendPlaySessionHandler implements MinecraftSessionHandler {
     return false;
   }
 
-  /**
-   * Returns the dimension a respawn moves the player into, if it is the Nether or the End.
-   *
-   * <p>From 1.16 the world is named by key, in the level name or, on 1.16.2 to 1.18.2, in the
-   * slot the dimension type uses elsewhere. Worlds created by plugins such as Multiverse are named
-   * after the world, so {@code lobby_nether} counts as well as {@code minecraft:the_nether}. Before
-   * 1.16 the dimension is a number.
-   */
-  static @Nullable Dimension portalDimension(final RespawnPacket packet) {
-    final DimensionInfo info = packet.getDimensionInfo();
-    if (info == null) {
-      return switch (packet.getDimension()) {
-        case -1 -> Dimension.NETHER;
-        case 1 -> Dimension.END;
-        default -> null;
-      };
-    }
-    final String key = (info.getLevelName() != null ? info.getLevelName()
-        : info.getRegistryIdentifier()).toLowerCase(Locale.ROOT);
-    if (key.equals("minecraft:the_nether") || key.endsWith("_nether")) {
-      return Dimension.NETHER;
-    }
-    if (key.equals("minecraft:the_end") || key.endsWith("_the_end")) {
-      return Dimension.END;
-    }
-    return null;
-  }
-
   @Override
   public boolean handle(TransferPacket packet) {
     final InetSocketAddress originalAddress = packet.address();
@@ -576,5 +548,33 @@ public class BackendPlaySessionHandler implements MinecraftSessionHandler {
     }
 
     playerConnection.setAutoReading(writable);
+  }
+
+  /**
+   * Returns the dimension a respawn moves the player into, if it is the Nether or the End.
+   *
+   * <p>From 1.16 the world is named by key, in the level name or, on 1.16.2 to 1.18.2, in the
+   * slot the dimension type uses elsewhere. Worlds created by plugins such as Multiverse are named
+   * after the world, so {@code lobby_nether} counts as well as {@code minecraft:the_nether}. Before
+   * 1.16 the dimension is a number.
+   */
+  static @Nullable Dimension portalDimension(final RespawnPacket packet) {
+    final DimensionInfo info = packet.getDimensionInfo();
+    if (info == null) {
+      return switch (packet.getDimension()) {
+        case -1 -> Dimension.NETHER;
+        case 1 -> Dimension.END;
+        default -> null;
+      };
+    }
+    final String key = (info.getLevelName() != null ? info.getLevelName()
+        : info.getRegistryIdentifier()).toLowerCase(Locale.ROOT);
+    if (key.equals("minecraft:the_nether") || key.endsWith("_nether")) {
+      return Dimension.NETHER;
+    }
+    if (key.equals("minecraft:the_end") || key.endsWith("_the_end")) {
+      return Dimension.END;
+    }
+    return null;
   }
 }
