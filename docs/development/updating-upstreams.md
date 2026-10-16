@@ -22,10 +22,11 @@ both upstreams and compares — Velocity's tip is new if it is not in `main`'s h
 if it differs from the `git-subtree-split:` trailer of the last `Squashed 'limbo/upstream/'`
 commit. When neither is new, the run is over in seconds. Only otherwise does the `update` job start.
 
-**It never does the same commits twice.** An update that stops for review leaves its issue's
-description and its release commit carrying a marker, `<!-- upstream velocity=<sha> limbo=<sha> -->`,
-naming exactly what it was made from. While an open `upstream-update` issue carries the marker of
-the current tips, the hourly check does nothing at all: no comment, no Claude, no build. When
+**It never does the same commits twice.** An update that stops for review leaves a marker,
+`<!-- upstream velocity=<sha> limbo=<sha> -->`, naming exactly what it was made from, in its issue's
+description and in a commit on its `upstream-update/<date>` branch. While an open `upstream-update`
+issue or such a branch carries the marker of the current tips, the hourly check does nothing at
+all: no comment, no Claude, no build. When
 upstream gets new commits the marker no longer matches, so the update is redone over the new
 state and the issue's description rewritten. *Run workflow* with **force** redoes it regardless.
 
@@ -84,8 +85,8 @@ copy, so nothing it edits in the checkout changes how it is judged.
 
 **When it merges by itself, and when it waits.** If a round passes, the update is **merged into
 `main` and released without anyone**: pushed to `main`, `release.yml` dispatched with
-`forkVersion` already bumped and Claude's notes, and the open `upstream-update` issue gets Claude's
-summary and is closed. If three rounds do not pass, Claude says a reason needs a person, it cannot
+`forkVersion` already bumped and Claude's notes, the open `upstream-update` issue gets Claude's
+summary and is closed, and the superseded `upstream-update/*` branches are deleted. If three rounds do not pass, Claude says a reason needs a person, it cannot
 conclude a conflicted merge, or `main` moved while it worked, nothing reaches `main`: its attempt
 is pushed to the `upstream-update/<date>` branch (unless the merge is still unconcluded) and the
 issue lists each round's errors and Claude's verdict, for a person to finish as below.
@@ -129,7 +130,8 @@ which restarts that count.
   already bumped and `docs/releases/<version>.md` drafted in manual mode: the commits and the
   reasons are filled in, and `MANUAL` comments mark what is left to write. After Claude, the
   branch holds its attempt instead.
-- If it conflicted, nothing is kept: a merge with conflict markers is not pushed anywhere.
+- If it conflicted, the merge is not kept: a merge with conflict markers is not pushed anywhere. The
+  `upstream-update/<date>` branch then holds a single empty commit carrying the marker.
 - An issue labelled **`upstream-update`** lists the reasons, what Claude tried, the run, the branch
   and the steps below. A later run that goes through closes it as superseded.
 - **Issues are optional.** The report is also written to the run's summary page, and the marker that
