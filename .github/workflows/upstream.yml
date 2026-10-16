@@ -99,9 +99,19 @@ jobs:
         # lookup redoes the update rather than skipping it.
         issue="$(gh issue list --repo "${GITHUB_REPOSITORY}" --label upstream-update --state open \
           --json number,body --jq ".[] | select(.body | contains(\"${MARKER}\")) | .number" \
-          | head -n 1)" || issue=""
-        if [ "${FORCE}" != "true" ] && [ -n "${issue}" ]; then
-          echo "These upstream commits are already waiting for review in #${issue}. Nothing to do."
+          2>/dev/null | head -n 1)" || issue=""
+        # The same marker is on an upstream-update/<date> branch, which works even with the
+        # repository's issues switched off: without it, every hour would redo the update, Claude
+        # included.
+        branch=""
+        for ref in $(git for-each-ref --format='%(refname:strip=2)' 'refs/remotes/origin/upstream-update/*'); do
+          if git log --format=%B "origin/main..${ref}" | grep -qF "${MARKER}"; then
+            branch="${ref#origin/}"
+            break
+          fi
+        done
+        if [ "${FORCE}" != "true" ] && [ -n "${issue}${branch}" ]; then
+          echo "These upstream commits are already waiting for review (${issue:+issue #${issue}}${issue:+${branch:+, }}${branch:+branch ${branch}}). Nothing to do."
           echo "run=false" >> "$GITHUB_OUTPUT"
         else
           echo "run=true" >> "$GITHUB_OUTPUT"
@@ -266,9 +276,13 @@ jobs:
         git push origin HEAD:main
         # Pushes made with GITHUB_TOKEN start no workflow, so the release is started by hand.
         gh workflow run release.yml --ref main
-        # An update that went through supersedes any that was waiting for review.
-        for issue in $(gh issue list --label upstream-update --state open --json number --jq '.[].number'); do
-          gh issue close "${issue}" --comment "Superseded: a later upstream update merged and was released as v${VERSION} automatically."
+        # An update that went through supersedes any that was waiting for review: its issue and its
+        # upstream-update/<date> branch.
+        for issue in $(gh issue list --label upstream-update --state open --json number --jq '.[].number' 2>/dev/null); do
+          gh issue close "${issue}" --comment "Superseded: a later upstream update merged and was released as v${VERSION} automatically." || true
+        done
+        git ls-remote --heads origin 'upstream-update/*' | awk '{ print $2 }' | while read -r ref; do
+          git push origin --delete "${ref#refs/heads/}" || true
         done
 
     # Claude's resolution passed everything a reviewer would ask for, so it merges itself.
@@ -300,6 +314,14 @@ jobs:
           echo
           echo "${MARKER}"
         } > "${WORK}/summary.md"
+        cat "${WORK}/summary.md" >> "$GITHUB_STEP_SUMMARY"
+        git ls-remote --heads origin 'upstream-update/*' | awk '{ print $2 }' | while read -r ref; do
+          git push origin --delete "${ref#refs/heads/}" || true
+        done
+        if [ "$(gh api "repos/${GITHUB_REPOSITORY}" --jq .has_issues 2>/dev/null)" != "true" ]; then
+          echo "::notice::Issues are disabled in this repository; the summary is in this run's summary page."
+          exit 0
+        fi
         gh label create upstream-update --color d93f0b \
           --description "An upstream update waiting for review" --force
         open="$(gh issue list --label upstream-update --state open --json number --jq '.[].number')"
@@ -336,6 +358,14 @@ jobs:
             unpushed="${branch}"
             branch=""
           fi
+        fi
+        # Nothing could be kept, but the check job still has to know these upstream commits are
+        # waiting, so a branch holding only the marker records it: one empty commit on main.
+        if [ -z "${branch}" ]; then
+          marker_commit="$(git commit-tree "${BASE}^{tree}" -p "${BASE}" \
+            -m "chore: upstream update waiting for review (nothing could be kept)" -m "${MARKER}")"
+          git push --force origin "${marker_commit}:refs/heads/upstream-update/$(date -u +%F)" \
+            || echo "::warning::Could not record the marker branch; the next run will redo this update."
         fi
         # After a conflict Claude concluded, claude-rounds.sh has rewritten these with the review
         # checks of the merged tree.
@@ -395,6 +425,11 @@ jobs:
           echo "${MARKER}"
         } > "${WORK}/issue.md"
 
+        cat "${WORK}/issue.md" >> "$GITHUB_STEP_SUMMARY"
+        if [ "$(gh api "repos/${GITHUB_REPOSITORY}" --jq .has_issues 2>/dev/null)" != "true" ]; then
+          echo "::error::The upstream update needs review. Issues are disabled in this repository, so the report is on this run's summary page; enable Issues (Settings -> General -> Features) to get it as an issue."
+          exit 1
+        fi
         gh label create upstream-update --color d93f0b \
           --description "An upstream update waiting for review" --force
         existing="$(gh issue list --label upstream-update --state open --json number --jq '.[0].number // empty')"

@@ -132,6 +132,11 @@ which restarts that count.
 - If it conflicted, nothing is kept: a merge with conflict markers is not pushed anywhere.
 - An issue labelled **`upstream-update`** lists the reasons, what Claude tried, the run, the branch
   and the steps below. A later run that goes through closes it as superseded.
+- **Issues are optional.** The report is also written to the run's summary page, and the marker that
+  stops the hourly check from redoing the same upstream commits is kept on the `upstream-update/<date>`
+  branch too (when nothing could be kept, on a branch holding a single empty commit with the
+  marker). With the repository's Issues switched off everything still works; you only lose the
+  issue as the place the report appears. A later update that goes through deletes these branches.
 
 Each check exists because that change has broken this fork, or would have, while the build stayed
 green. The sections further down say why for each.
