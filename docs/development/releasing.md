@@ -8,8 +8,8 @@ This page is how that works, and how to steer it when the default is not what yo
 
 ## What happens on a push to main
 
-1. **Is there anything to release?** A push that touches only documentation (`docs/`, any `.md`) or
-   CI (`.github/`) starts no run at all: the jar would be identical to the last one. Those changes
+1. **Is there anything to release?** A push that touches only documentation (`docs/`, any `.md`),
+   CI (`.github/`) or `.gitignore`/`.gitattributes` starts no run at all: the jar would be identical to the last one. Those changes
    go out with the next real change.
 2. **Which version?** `.github/scripts/next-version.sh` reads the commits since the last stable tag
    and takes the largest bump any of them asks for:

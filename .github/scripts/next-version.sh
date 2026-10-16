@@ -12,7 +12,8 @@
 #
 # Usage: next-version.sh <ref-type> <ref-name>   (GITHUB_REF_TYPE and GITHUB_REF_NAME)
 #
-# A commit counts only if it changes something other than documentation or CI: those leave the jar
+# A commit counts only if it changes something other than documentation, CI or the repository's own
+# git settings (.gitignore, .gitattributes): those leave the jar
 # identical, and a release whose jar is the same as the last one only adds noise. The release
 # commits this workflow makes itself are skipped too.
 set -euo pipefail
@@ -64,7 +65,7 @@ fi
 relevant() {
   # A merge commit's own diff is empty here; the commits it brings in are listed on their own.
   git diff-tree --no-commit-id --name-only -r "$1" \
-    | grep -Ev '^(docs/|\.github/)|\.md$' | grep -q .
+    | grep -Ev '^(docs/|\.github/|\.git(ignore|attributes)$)|\.md$' | grep -q .
 }
 
 bump=""

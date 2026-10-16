@@ -157,7 +157,8 @@ Two workflows do what used to be done by hand. Know what they do before pushing 
 **a push to `main` is a release**.
 
 **`.github/workflows/release.yml` releases every change that reaches `main`** — a merged pull
-request, a direct push — except one touching only `docs/`, `.md` files or `.github/`, whose jar would
+request, a direct push — except one touching only `docs/`, `.md` files, `.github/` or
+`.gitignore`/`.gitattributes`, whose jar would
 be identical. The version comes from the commit subjects since the last stable tag: `feat:` is a
 minor, `type!:` or `BREAKING CHANGE` a major, anything else a patch. So the subject you write *is*
 the version decision: use `feat:` for a feature, and never `feat:` for a fix. It builds first, then
