@@ -36,7 +36,11 @@ Fork-specific behaviour:
 - **Portal redirects** (`BackendPlaySessionHandler#handle(RespawnPacket)`, the `[portales]`
   section) — a backend moving a player into the Nether or the End sends them to the configured
   server instead. The respawn packet is still forwarded, so a failed connection leaves the player
-  consistent on the origin. See `docs/guide/portal-redirects.md`.
+  consistent on the origin. **The backend's respawn is registered encode-only in `StateRegistry`**,
+  so it is never decoded: it reaches `handleUnknown` as a raw buffer and is read there.
+  `handle(RespawnPacket)` alone never fires, which is how 1.3.0-beta.1 shipped not working. The
+  section is written with multi-line inline tables, so the configuration is parsed as TOML 1.1
+  (`config/Toml11Format.java`). See `docs/guide/portal-redirects.md`.
 - **Plugin auto-update** (`plugin/update/`, the `[plugins]` section) — listed plugins are
   downloaded and updated in parallel from Hangar, Modrinth, GitHub, GeyserMC and LuckPerms,
   immediately before `loadPlugins()`. See `docs/guide/getting-started.md`.
