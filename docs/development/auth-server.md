@@ -5,7 +5,7 @@ this fork carries) as the holding area for players who have not authenticated ye
 **in-process** inside the proxy JVM — there is no second process to install, configure or monitor.
 
 "Limbo" is the upstream project's name for the technique. Everything an operator sees calls it the
-authentication server, including the `[Auth]` prefix in the console.
+authentication server, including the `[auth]` prefix in the console.
 
 The rationale, and the options rejected to get here, are in
 [offline-auth-plan.md](offline-auth-plan.md).
@@ -41,6 +41,8 @@ If the remote is not configured yet:
 git remote add limbo-upstream https://github.com/Nan1t/NanoLimbo.git
 ```
 
+This normally happens by itself: the hourly upstream workflow pulls the subtree too, and any
+NanoLimbo change stops for review (see [updating-upstreams.md](updating-upstreams.md#it-runs-by-itself)).
 After pulling, re-apply any of the patches below that conflicted, bump `LIMBO_VERSION` in
 `limbo/src/main/java/ua/nanit/limbo/BuildConfig.java`, and check upstream's
 `gradle/libs.versions.toml` for dependency bumps that need mirroring into this repository's catalog.
@@ -48,12 +50,14 @@ After pulling, re-apply any of the patches below that conflicted, bump `LIMBO_VE
 ## Local patches
 
 Kept deliberately small — every modified file inside `upstream/` is a potential merge conflict.
-Both patches are marked in the source with a `HybridAuth patch:` comment.
+All three are marked in the source with a `HybridAuth patch:` comment, and the upstream update's
+review checks stop it for review if a pull leaves fewer files carrying that marker.
 
 | File | Change | Why |
 | --- | --- | --- |
 | `server/Log.java` | Use `org.slf4j.Logger` instead of casting to `ch.qos.logback.classic.Logger`; `setLevel` only records the level instead of reconfiguring logback | Upstream logs through logback. The proxy uses log4j2 with `log4j-slf4j2-impl`, so the logback cast would throw `ClassCastException` at startup. Log levels now follow the proxy's own logging configuration. |
 | `server/LimboServer.java` | Added `start(Path)` and `startEmbedded(Path)`; `stop()` made public; the interactive `CommandManager`, the JVM shutdown hook and `System.gc()` are skipped when embedded | The command manager reads `System.in` and would fight the proxy console. Lifecycle is driven by `VelocityServer` instead. The working-directory parameter avoids the hardcoded `Paths.get("./")`. |
+| `configuration/LimboConfig.java` | Added `override(SocketAddress, InfoForwarding)`, which `load()` uses instead of the bind address and forwarding in `settings.yml` | The proxy decides both: the authentication server must stay on loopback, and its forwarding must match the proxy's. They are installed before `load()`, because an absent `infoForwarding` node makes upstream's serializer throw. |
 
 ## Configuration
 
@@ -90,7 +94,7 @@ the shaded jar. The versions line up closely with upstream's own:
 
 | Library | NanoLimbo 1.13.0 | HybridAuth |
 | --- | --- | --- |
-| Netty | 4.2.15.Final | 4.2.16.Final |
+| Netty | 4.2.15.Final | 4.2.19.Final |
 | Gson | 2.14.0 | 2.14.0 |
 | Configurate | 4.2.0 | 4.2.0 |
 | Adventure | 5.1.1 | 5.2.0 |

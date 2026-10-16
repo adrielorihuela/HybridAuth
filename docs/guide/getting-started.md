@@ -9,10 +9,11 @@ still applies — this page only covers what is different.
 on an older runtime prints a message telling you so rather than a stack trace.
 
 Download `HybridAuth-<version>.jar` from the
-[releases](https://github.com/adrielorihuela/HybridAuth/releases) and run it:
+[releases](https://github.com/adrielorihuela/HybridAuth/releases) — the newest one at the top — and
+run it, with `<version>` as in the file you downloaded:
 
 ```bash
-java -Xms512M -Xmx512M -jar HybridAuth-1.1.1.jar
+java -Xms512M -Xmx512M -jar HybridAuth-<version>.jar
 ```
 
 ### Getting more out of the same machine
@@ -24,7 +25,7 @@ collected quickly:
 ```bash
 java -Xms512M -Xmx512M \
      -XX:+UseG1GC -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=4M \
-     -jar HybridAuth-1.1.1.jar
+     -jar HybridAuth-<version>.jar
 ```
 
 Set `-Xms` equal to `-Xmx` so the heap is never resized at runtime. 512 MB is plenty for a few
@@ -102,8 +103,8 @@ about backing up `auth/player-passwords.db`.
 
 ## Keeping plugins up to date
 
-List the plugins you want and the proxy keeps them current for you. Four sources, and you can mix
-them freely:
+List the plugins you want and the proxy keeps them current for you. Five sources — Hangar,
+Modrinth, GitHub, GeyserMC and LuckPerms — and you can mix them freely:
 
 ```toml
 [plugins]

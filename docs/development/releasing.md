@@ -9,8 +9,8 @@ This page is how that works, and how to steer it when the default is not what yo
 ## What happens on a push to main
 
 1. **Is there anything to release?** A push that touches only documentation (`docs/`, any `.md`),
-   CI (`.github/`) or `.gitignore`/`.gitattributes` starts no run at all: the jar would be identical to the last one. Those changes
-   go out with the next real change.
+   CI (`.github/`) or `.gitignore`/`.gitattributes` starts no run at all: the jar would be
+   identical to the last one. Those changes go out with the next real change.
 2. **Which version?** `.github/scripts/next-version.sh` reads the commits since the last stable tag
    and takes the largest bump any of them asks for:
 
@@ -20,7 +20,7 @@ This page is how that works, and how to steer it when the default is not what yo
    | `feat!: …`, any `type!:`, or a body with `BREAKING CHANGE` | major | 1.3.0 → 2.0.0 |
    | anything else (`fix:`, `chore:`, upstream's own commits, …) | patch | 1.3.0 → 1.3.1 |
 
-   Commits that only touch documentation or CI are not counted, and nor are the workflow's own
+   Commits that only touch documentation, CI or git's own settings are not counted, and nor are the workflow's own
    `chore: release` commits. So **the commit subject is how you choose the version**: write `feat:`
    when you add something.
 3. **Build.** `./gradlew build` — compilation, Checkstyle, Spotless, every test. If it fails, nothing

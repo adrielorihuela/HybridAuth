@@ -176,9 +176,10 @@ build) and only when one has commits `main` lacks does it merge them. It resolve
 conflict (`gradle.properties` / `libs.versions.toml`, key by key), runs the review checks in
 `.github/scripts/review-checks.sh`, builds, starts the jar, and — only if all of that passes — pushes
 to `main` and releases a patch with notes from `docs/releases/TEMPLATE-upstream.md` saying it was
-automatic. It never redoes the same upstream commits: the issue and release commit carry
-`<!-- upstream velocity=<sha> limbo=<sha> -->`, and an open issue with the current marker means
-nothing happens.
+automatic. It never redoes the same upstream commits: the issue and a commit on the
+`upstream-update/<date>` branch carry `<!-- upstream velocity=<sha> limbo=<sha> -->`, and an open
+issue or such a branch with the current marker means nothing happens — so it works with the
+repository's Issues switched off too.
 
 When something needs judgment and the `CLAUDE_CODE_OAUTH_TOKEN` secret is set, **Claude resolves it
 in the same run, on the runner**, with the prompt in **`.github/claude/resolve-upstream.md`** (edit
@@ -384,7 +385,7 @@ database lookup — the `requires` predicates run earlier, while the answer is s
 
 Commands are Brigadier nodes registered through `VelocityCommandManager`, which lowercases
 aliases (so commands are case-insensitive regardless of the literal's casing). The proxy's own
-command is `/hybridauth`, with `hv` and `velocity` as aliases.
+command is `/hybridauth`, with `ha`, `hv`, `hybridvelocity` and `velocity` as aliases.
 
 Permissions are tri-state and are checked **only** through the two helpers in
 `command/builtin/BuiltinCommandUtil.java`, never by calling `getPermissionValue` directly. Nodes are

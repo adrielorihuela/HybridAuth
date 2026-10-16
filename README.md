@@ -128,11 +128,15 @@ ViaVersion, ViaBackwards, ViaRewind, Geyser, Floodgate, LuckPerms and every othe
 ## Quick start
 
 Download `HybridAuth-<version>.jar` from the
-[releases](https://github.com/adrielorihuela/HybridAuth/releases) and run it:
+[releases](https://github.com/adrielorihuela/HybridAuth/releases) — the newest one at the top — and
+run it:
 
 ```bash
-java -Xms512M -Xmx512M -jar HybridAuth-1.3.0.jar
+java -Xms512M -Xmx512M -jar HybridAuth-<version>.jar
 ```
+
+A new release goes out by itself whenever something changes, including whenever Velocity does: the
+fork follows upstream automatically, usually within the hour.
 
 Java 25 is required.
 
@@ -146,9 +150,10 @@ Then read [docs/guide/getting-started.md](docs/guide/getting-started.md).
 ## Documentation
 
 - **[docs/guide/](docs/guide/README.md)** — running the proxy: installation, the authentication
-  gate and its options, the plugin updater, the per-server commands.
+  gate and its options, the plugin updater, the per-server commands, the portal redirects.
 - **[docs/development/](docs/development/README.md)** — how it was built: the specification, the
-  protocol research, the attempt that failed and the architecture that replaced it.
+  protocol research, the attempt that failed and the architecture that replaced it — and how it is
+  kept current: releases, and the automatic updates from Velocity and NanoLimbo.
 
 Anything not covered there behaves as upstream, so the
 [Velocity documentation](https://docs.papermc.io/velocity) still applies.

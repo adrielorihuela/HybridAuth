@@ -23,4 +23,4 @@ Offline players need somewhere to wait that is not a real server. Synthesising t
 means writing and forever maintaining per-version protocol code — the first attempt died on exactly
 that, sending an empty configuration phase and never sending `Login (play)` at all. So the fork
 embeds an existing limbo server instead, vendored as a subtree, and keeps its own patch surface to
-two files.
+three files.
