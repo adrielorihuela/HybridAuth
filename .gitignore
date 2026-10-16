@@ -78,6 +78,9 @@ $RECYCLE.BIN/
 gradle-app.setting
 !gradle-wrapper.jar
 .gradletasknamecache
+# Kotlin 2 compiles build-logic with session files here while Gradle runs, which makes the
+# working tree look dirty to the upstream tasks halfway through their own check.
+.kotlin/
 
 ### Other trash ###
 logs/

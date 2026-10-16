@@ -1,0 +1,201 @@
+# Keeps the fork up to date with upstream Velocity and NanoLimbo, by itself where that is safe.
+# How it works and what to do when it stops: docs/development/updating-upstreams.md.
+#
+# Every Monday (or on demand) it merges both upstreams into main the documented way and decides:
+#
+#   - Nothing new upstream: nothing happens.
+#   - Merged, the build and the smoke test pass, and no review check fires: the update is pushed to
+#     main and released as the next patch version, with notes from
+#     docs/releases/TEMPLATE-upstream.md saying that, and why nobody needed to look at it.
+#   - Anything else (a conflict that is not mechanical, a red build, a proxy that does not start, or
+#     a change of the kind that has broken this fork before): nothing reaches main. The merge, if it
+#     finished, waits on an upstream-update/<date> branch with drafted notes, and an issue labelled
+#     upstream-update says what needs judgment and how to finish it. The run fails, so it shows.
+
+name: Upstream update
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  actions: write
+
+concurrency:
+  group: upstream
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-24.04
+    env:
+      WORK: ${{ github.workspace }}/../upstream-work
+      GH_TOKEN: ${{ github.token }}
+    steps:
+    - name: Checkout main
+      uses: actions/checkout@v6
+      with:
+        ref: main
+        # The subtree pull finds its previous import by searching the whole history.
+        fetch-depth: 0
+    - name: Set up Gradle
+      uses: gradle/actions/setup-gradle@v5
+    - name: Set up JDK 25
+      uses: actions/setup-java@v5
+      with:
+        java-version: 25
+        distribution: 'zulu'
+    - name: Configure git
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        mkdir -p "${WORK}"
+
+    - name: Merge the upstreams
+      id: merge
+      run: .github/scripts/upstream-merge.sh "${WORK}" | tee -a "$GITHUB_OUTPUT"
+
+    - name: Review checks
+      id: review
+      if: steps.merge.outputs.status == 'merged'
+      run: |
+        .github/scripts/review-checks.sh "${{ steps.merge.outputs.base }}" HEAD > "${WORK}/reasons.txt"
+        cat "${WORK}/reasons.txt"
+        if [ -s "${WORK}/reasons.txt" ]; then echo "clean=false"; else echo "clean=true"; fi >> "$GITHUB_OUTPUT"
+
+    - name: Build with Gradle
+      id: build
+      if: steps.merge.outputs.status == 'merged'
+      continue-on-error: true
+      run: ./gradlew build
+
+    - name: Smoke test
+      id: smoke
+      if: steps.merge.outputs.status == 'merged' && steps.build.outcome == 'success'
+      continue-on-error: true
+      run: |
+        version="$(grep '^forkVersion=' gradle.properties | cut -d= -f2)"
+        .github/scripts/smoke-test.sh "proxy/build/libs/HybridAuth-${version}.jar"
+
+    - name: Decide
+      id: decide
+      run: |
+        status="${{ steps.merge.outputs.status }}"
+        reasons="${WORK}/reasons.txt"
+        touch "${reasons}"
+        if [ "${status}" = "uptodate" ]; then
+          echo "Both upstreams are already merged. Nothing to do."
+          echo "path=none" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        if [ "${status}" = "conflict" ]; then
+          echo "The merge conflicts in files that need a person: $(paste -sd, "${WORK}/conflicts.txt" | sed 's/,/, /g')" >> "${reasons}"
+        fi
+        if [ "${status}" = "merged" ] && [ "${{ steps.build.outcome }}" != "success" ]; then
+          echo "./gradlew build failed on the merged tree; the run's log has the failure" >> "${reasons}"
+        elif [ "${status}" = "merged" ] && [ "${{ steps.smoke.outcome }}" != "success" ]; then
+          echo "The proxy built but did not start cleanly in the smoke test; the run's log has its output" >> "${reasons}"
+        fi
+        if [ -s "${reasons}" ]; then
+          echo "path=manual" >> "$GITHUB_OUTPUT"
+        else
+          echo "path=auto" >> "$GITHUB_OUTPUT"
+        fi
+        previous="$(git tag --list 'v[0-9]*' --sort=-v:refname | grep -v -- '-' | head -n 1)"
+        IFS=. read -r major minor patch <<< "${previous#v}"
+        echo "previous=${previous}" >> "$GITHUB_OUTPUT"
+        echo "version=${major}.${minor}.$((patch + 1))" >> "$GITHUB_OUTPUT"
+
+    # Release as a patch: an upstream update that needed nobody changes nothing this fork adds.
+    - name: Release automatically
+      if: steps.decide.outputs.path == 'auto'
+      env:
+        VERSION: ${{ steps.decide.outputs.version }}
+        PREVIOUS: ${{ steps.decide.outputs.previous }}
+      run: |
+        sed -i "s/^forkVersion=.*/forkVersion=${VERSION}/" gradle.properties
+        python3 -I .github/scripts/render-notes.py upstream --mode auto --version "${VERSION}" \
+          --previous "${PREVIOUS}" --base "${{ steps.merge.outputs.base }}" \
+          --velocity-ref upstream/dev/4.0.0 --resolved "${WORK}/resolved.txt" \
+          > "docs/releases/${VERSION}.md"
+        git add gradle.properties "docs/releases/${VERSION}.md"
+        git commit -m "chore: release ${VERSION} (automatic upstream update)" \
+          -m "The weekly upstream update merged cleanly, built, started, and fired no review check, so it is released without anyone. See docs/releases/${VERSION}.md."
+        git push origin HEAD:main
+        # Pushes made with GITHUB_TOKEN start no workflow, so the release is started by hand.
+        gh workflow run release.yml --ref main
+        # An update that went through supersedes any that was waiting for review.
+        for issue in $(gh issue list --label upstream-update --state open --json number --jq '.[].number'); do
+          gh issue close "${issue}" --comment "Superseded: a later upstream update merged and was released as v${VERSION} automatically."
+        done
+
+    - name: Hand over for review
+      if: steps.decide.outputs.path == 'manual'
+      env:
+        VERSION: ${{ steps.decide.outputs.version }}
+        PREVIOUS: ${{ steps.decide.outputs.previous }}
+        STATUS: ${{ steps.merge.outputs.status }}
+      run: |
+        run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+        branch=""
+        if [ "${STATUS}" = "merged" ]; then
+          # The merge is kept, with its notes drafted, so whoever finishes it starts from here.
+          sed -i "s/^forkVersion=.*/forkVersion=${VERSION}/" gradle.properties
+          python3 -I .github/scripts/render-notes.py upstream --mode manual --version "${VERSION}" \
+            --previous "${PREVIOUS}" --base "${{ steps.merge.outputs.base }}" \
+            --velocity-ref upstream/dev/4.0.0 --reasons "${WORK}/reasons.txt" \
+            --resolved "${WORK}/resolved.txt" > "docs/releases/${VERSION}.md"
+          git add gradle.properties "docs/releases/${VERSION}.md"
+          git commit -m "chore: release ${VERSION} (upstream update, needs review)" \
+            -m "Drafted by the weekly upstream update, which stopped for review. Not on main until somebody finishes it."
+          branch="upstream-update/$(date -u +%F)"
+          git push --force origin "HEAD:refs/heads/${branch}"
+        fi
+
+        {
+          echo "The weekly upstream update stopped, because something in it needs judgment rather than a script."
+          echo
+          echo "## What needs review"
+          echo
+          sed 's/^/- /' "${WORK}/reasons.txt"
+          echo
+          echo "## Where it is"
+          echo
+          echo "- Run: ${run_url}"
+          echo "- main before the update: \`${{ steps.merge.outputs.base }}\`"
+          echo "- Velocity: \`$(git rev-parse --short upstream/dev/4.0.0)\` on \`dev/4.0.0\`"
+          if [ -n "${branch}" ]; then
+            echo "- The merge, with \`forkVersion=${VERSION}\` and draft notes in \`docs/releases/${VERSION}.md\`: [\`${branch}\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/tree/${branch})"
+          else
+            echo "- Nothing was kept: a merge with conflict markers in it is not pushed anywhere. Re-run the merge locally (below)."
+          fi
+          echo
+          echo "## To finish it"
+          echo
+          echo "Ask Claude to \"resolve the upstream update in this issue\" (with its link), or follow [updating-upstreams.md](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/main/docs/development/updating-upstreams.md#when-it-stops-for-review):"
+          echo
+          if [ -n "${branch}" ]; then
+            echo "1. Start from \`${branch}\`."
+          else
+            echo "1. On an up-to-date \`main\`, run \`./gradlew updateUpstreams\` and resolve the conflicts as that page says (keep both sides)."
+          fi
+          echo "2. Deal with every point under *What needs review*."
+          echo "3. Finish \`docs/releases/${VERSION}.md\`: fill in the \`MANUAL\` sections with what was found and what was done."
+          echo "4. \`./gradlew build\`, then start the jar and check the boot line and the authentication server."
+          echo "5. Merge into \`main\` (a merge, never a squash or rebase). \`release.yml\` releases \`v${VERSION}\` with those notes, and closing this issue is the last step."
+        } > "${WORK}/issue.md"
+
+        gh label create upstream-update --color d93f0b \
+          --description "An upstream update waiting for review" --force
+        existing="$(gh issue list --label upstream-update --state open --json number --jq '.[0].number // empty')"
+        if [ -n "${existing}" ]; then
+          gh issue comment "${existing}" --body-file "${WORK}/issue.md"
+          echo "Updated issue #${existing}."
+        else
+          gh issue create --title "Upstream update needs review (v${VERSION})" \
+            --label upstream-update --body-file "${WORK}/issue.md"
+        fi
+        echo "::error::The upstream update needs review; see the upstream-update issue."
+        exit 1
