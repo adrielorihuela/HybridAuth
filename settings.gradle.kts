@@ -38,7 +38,7 @@ include(deprecatedConfigurateModule)
 project(deprecatedConfigurateModule).projectDir = file("proxy/deprecated/configurate3")
 
 // Embedded limbo server. `limbo/upstream` is a pristine git subtree of NanoLimbo; the module's
-// own build script lives one level up so that subtree pulls never conflict. See docs/limbo.md.
+// own build script lives one level up so that subtree pulls never conflict. See docs/development/auth-server.md.
 val limboModule = ":limbo"
 include(limboModule)
 project(limboModule).projectDir = file("limbo")

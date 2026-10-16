@@ -17,6 +17,8 @@
 
 package com.velocitypowered.proxy.command.builtin;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -54,12 +56,28 @@ class BuiltinCommandUtilTest {
   }
 
   @Test
-  void olderNodeStillGrants() {
-    // Somebody who granted these before a rename must not have to grant them again.
-    assertTrue(BuiltinCommandUtil.isAllowed(
-        sourceWith(Map.of("hybridvelocity.command." + NODE, Tristate.TRUE)), NODE));
+  void upstreamNodeStillGrants() {
+    // Somebody who granted these on stock Velocity must not have to grant them again.
     assertTrue(BuiltinCommandUtil.isAllowed(
         sourceWith(Map.of("velocity.command." + NODE, Tristate.TRUE)), NODE));
+  }
+
+  @Test
+  void legacyPrefixIsTheUpstreamLiteral() {
+    // Out of date on purpose: a search and replace of a project rename must never touch it, or
+    // every permission set up for stock Velocity silently stops counting.
+    assertArrayEquals(new String[]{"velocity.command."},
+        BuiltinCommandUtil.LEGACY_PERMISSION_PREFIXES);
+  }
+
+  @Test
+  void droppedForkPrefixNoLongerCounts() {
+    // hybridvelocity.command.* was dropped in 1.3.1; the release notes say to move to
+    // hybridauth.command.*.
+    assertFalse(BuiltinCommandUtil.isAllowed(
+        sourceWith(Map.of("hybridvelocity.command." + NODE, Tristate.TRUE)), NODE));
+    assertTrue(BuiltinCommandUtil.isNotDenied(
+        sourceWith(Map.of("hybridvelocity.command." + SERVER, Tristate.FALSE)), SERVER));
   }
 
   @Test
@@ -75,32 +93,42 @@ class BuiltinCommandUtilTest {
   }
 
   @Test
-  void newerOfTwoOlderNodesWins() {
-    assertFalse(BuiltinCommandUtil.isAllowed(sourceWith(Map.of(
-        "hybridvelocity.command." + NODE, Tristate.FALSE,
-        "velocity.command." + NODE, Tristate.TRUE)), NODE));
-  }
-
-  @Test
   void defaultAllowCommandsAreAllowedWithNoPermissionsAtAll() {
     assertTrue(BuiltinCommandUtil.isNotDenied(sourceWith(Map.of()), SERVER));
   }
 
   @Test
-  void nodeSayingNoDenies() {
-    // Not an OR over the prefixes: an operator who wrote -velocity.command.server.lobby before any
-    // of this expects it to keep blocking, and a plain OR would quietly stop honouring it.
-    for (final String prefix
-        : new String[]{"hybridauth.command.", "hybridvelocity.command.", "velocity.command."}) {
+  void eitherNodeSayingNoDeniesWhenTheCurrentOneIsUnset() {
+    // An operator who wrote velocity.command.server.lobby false on stock Velocity expects it to
+    // keep blocking, as long as they have not set the current node since.
+    for (final String prefix : new String[]{"hybridauth.command.", "velocity.command."}) {
       assertFalse(BuiltinCommandUtil.isNotDenied(
           sourceWith(Map.of(prefix + SERVER, Tristate.FALSE)), SERVER), prefix);
     }
   }
 
   @Test
-  void grantOnOneNodeDoesNotOverrideDenyOnAnother() {
-    assertFalse(BuiltinCommandUtil.isNotDenied(sourceWith(Map.of(
+  void grantOnTheCurrentNodeWinsOverDenyOnAnOlderOne() {
+    // The LuckPerms report: hybridauth.command.server.lobby true did nothing while anything still
+    // resolved velocity.command.server.lobby to false.
+    assertTrue(BuiltinCommandUtil.isNotDenied(sourceWith(Map.of(
         "hybridauth.command." + SERVER, Tristate.TRUE,
         "velocity.command." + SERVER, Tristate.FALSE)), SERVER));
+  }
+
+  @Test
+  void bothHelpersAgreeOnWhichNodeDecides() {
+    for (final Tristate current : Tristate.values()) {
+      for (final Tristate legacy : Tristate.values()) {
+        final CommandSource source = sourceWith(Map.of(
+            "hybridauth.command." + NODE, current, "velocity.command." + NODE, legacy));
+        final Tristate deciding = current != Tristate.UNDEFINED ? current : legacy;
+        final String description = current + "/" + legacy;
+        assertEquals(deciding == Tristate.TRUE,
+            BuiltinCommandUtil.isAllowed(source, NODE), description);
+        assertEquals(deciding != Tristate.FALSE,
+            BuiltinCommandUtil.isNotDenied(source, NODE), description);
+      }
+    }
   }
 }

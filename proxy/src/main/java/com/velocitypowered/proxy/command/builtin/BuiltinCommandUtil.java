@@ -32,18 +32,16 @@ class BuiltinCommandUtil {
   static final String PERMISSION_PREFIX = "hybridauth.command.";
 
   /**
-   * Prefixes these nodes have used before, still honoured as fallbacks.
+   * Prefixes still honoured as fallbacks when the current node is unset.
    *
    * <p>A rename that silently revokes access an operator has already granted is a rename that
-   * breaks their server, and they would have no way to connect the two events. So every prefix
-   * this project has used keeps working: {@code hybridvelocity.} from the first rename and
-   * {@code velocity.} from upstream. They are literals on purpose — a name that existed in the
-   * past must never be renamed along with the current one, or the fallback stops finding
-   * anything. They can be dropped in a future major version, once nobody is
-   * running a permissions setup that predates them.</p>
+   * breaks their server, and they would have no way to connect the two events. So upstream
+   * Velocity's {@code velocity.} keeps working, and pointing this jar at a stock Velocity
+   * installation keeps its permissions. It is a literal on purpose — a name from upstream must
+   * never be renamed along with the current one, or the fallback stops finding anything.
+   * ({@code hybridvelocity.}, this fork's own pre-rename prefix, was dropped in 1.3.1.)</p>
    */
-  static final String[] LEGACY_PERMISSION_PREFIXES = {
-      "hybridvelocity.command.", "velocity.command."};
+  static final String[] LEGACY_PERMISSION_PREFIXES = {"velocity.command."};
 
   private BuiltinCommandUtil() {
     throw new AssertionError();
@@ -57,50 +55,63 @@ class BuiltinCommandUtil {
   }
 
   /**
-   * Whether a privileged command is allowed — granted only if the permission says so explicitly.
+   * Whether a privileged command is allowed — granted only if a permission says so explicitly.
    *
-   * <p>Used by the commands only an administrator should have. The legacy node is consulted only
-   * when the current one is unset, so an explicit deny on the current node always wins.</p>
+   * <p>Used by the commands only an administrator should have. See {@link #resolve} for which node
+   * decides.</p>
    *
    * @param source the command source
    * @param suffix the node after the prefix, for example {@code "reload"}
    * @return whether the source may run the command
    */
   static boolean isAllowed(final CommandSource source, final String suffix) {
-    final Tristate current = source.getPermissionValue(PERMISSION_PREFIX + suffix);
-    if (current != Tristate.UNDEFINED) {
-      return current == Tristate.TRUE;
-    }
-    for (final String legacy : LEGACY_PERMISSION_PREFIXES) {
-      final Tristate value = source.getPermissionValue(legacy + suffix);
-      if (value != Tristate.UNDEFINED) {
-        return value == Tristate.TRUE;
-      }
-    }
-    return false;
+    return resolve(source, suffix) == Tristate.TRUE;
   }
 
   /**
    * Whether a command everyone should have is allowed — denied only if a permission says so.
    *
-   * <p>Used by {@code /server} and the per-server shortcut commands. <strong>Any</strong> node
-   * saying no is enough to deny: an operator who wrote {@code -velocity.command.server.lobby}
-   * before a rename still expects it to block, and treating the nodes as a plain OR would silently
-   * stop honouring it.</p>
+   * <p>Used by {@code /server} and the per-server shortcut commands. See {@link #resolve} for
+   * which node decides: a grant on the current node therefore wins over a deny on a legacy one,
+   * which is what an operator who set {@code hybridauth.command.server.lobby true} expects, and a
+   * legacy deny still blocks as long as the current node is left unset.</p>
    *
    * @param source the command source
    * @param suffix the node after the prefix, for example {@code "server.lobby"}
    * @return whether the source may run the command
    */
   static boolean isNotDenied(final CommandSource source, final String suffix) {
-    if (source.getPermissionValue(PERMISSION_PREFIX + suffix) == Tristate.FALSE) {
-      return false;
+    return resolve(source, suffix) != Tristate.FALSE;
+  }
+
+  /**
+   * The value of the first node that is set, current prefix first, then each legacy prefix.
+   *
+   * <p>Both helpers share this, so the two kinds of command can never disagree about which node
+   * decides. Only the default differs: {@link Tristate#UNDEFINED} allows a command everyone has
+   * and refuses a privileged one.</p>
+   *
+   * <p>Earlier versions let <em>any</em> node saying no deny a default-allowed command. With
+   * LuckPerms that made the current node impossible to use on its own: a default group, a
+   * {@code velocity.command.*} wildcard or a leftover {@code velocity.command.server false}
+   * resolved the legacy node to false, and the operator's grant on the current node was ignored
+   * without a trace.</p>
+   *
+   * @param source the command source
+   * @param suffix the node after the prefix
+   * @return the deciding value, or {@link Tristate#UNDEFINED} if no node is set
+   */
+  private static Tristate resolve(final CommandSource source, final String suffix) {
+    final Tristate current = source.getPermissionValue(PERMISSION_PREFIX + suffix);
+    if (current != Tristate.UNDEFINED) {
+      return current;
     }
     for (final String legacy : LEGACY_PERMISSION_PREFIXES) {
-      if (source.getPermissionValue(legacy + suffix) == Tristate.FALSE) {
-        return false;
+      final Tristate value = source.getPermissionValue(legacy + suffix);
+      if (value != Tristate.UNDEFINED) {
+        return value;
       }
     }
-    return true;
+    return Tristate.UNDEFINED;
   }
 }

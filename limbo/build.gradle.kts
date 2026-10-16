@@ -6,8 +6,9 @@
 // subtree. Keeping upstream untouched is what makes `git subtree pull` conflict-free.
 //
 // Dependencies are declared against this repository's version catalog rather than upstream's, so
-// that a single Netty/Gson/Adventure version resolves across the whole shaded jar. See docs/limbo.md
-// for the list of local patches and how to update the subtree.
+// that a single Netty/Gson/Adventure version resolves across the whole shaded jar. See
+// docs/development/auth-server.md for the list of local patches, and
+// docs/development/updating-upstreams.md for how to update the subtree.
 
 plugins {
     `java-library`
