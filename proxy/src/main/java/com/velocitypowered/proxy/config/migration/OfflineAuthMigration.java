@@ -19,6 +19,7 @@ package com.velocitypowered.proxy.config.migration;
 
 import static com.velocitypowered.proxy.config.VelocityConfiguration.OfflineAuthConfig.DEFAULT;
 
+import com.electronwill.nightconfig.core.UnmodifiableConfig;
 import com.electronwill.nightconfig.core.file.CommentedFileConfig;
 import org.apache.logging.log4j.Logger;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -39,7 +40,7 @@ public final class OfflineAuthMigration implements ConfigurationMigration {
   private static final double FORK_VERSION = 1.0;
 
   /**
-   * The number upstream Velocity's own configurations carry today.
+   * The upstream number this fork's configurations were really at when it wrote its own.
    *
    * <p>Used to undo a mistake: this migration used to write {@code config-version = "3.2"}, which
    * is upstream's key and upstream's numbering. Upstream is at 2.8, so 3.2 sat on four numbers
@@ -95,11 +96,17 @@ public final class OfflineAuthMigration implements ConfigurationMigration {
         a server with no socket could not be pinged by ViaVersion.
         Set 0 to let the system pick a free port on each start.""");
 
-    // Hand upstream's key back, if this installation is carrying the number we should never have
-    // written into it. Only ever from that exact value, and only while our own key is absent, so
-    // this cannot walk a legitimately newer configuration backwards.
+    // Hand upstream's key back, if this installation is carrying a number we should never have
+    // written into it. Only while our own key is absent, so this cannot walk a legitimately newer
+    // configuration backwards.
+    //
+    // The fork wrote 2.9, 3.0 and 3.2 at various points, and upstream has since reached 2.9 for
+    // real (PingPassthroughMigration), so the number alone no longer tells the two apart. What does
+    // is the shape: upstream's 2.9 turns `ping-passthrough` into a table, and the fork never did.
+    // Walking a real 2.9 back would make that migration run again on its own output.
     final double upstreamVersion = configVersion(config);
-    if (upstreamVersion > 2.8 && upstreamVersion <= 3.2) {
+    if (upstreamVersion > 2.8 && upstreamVersion <= 3.2
+        && !(config.get("ping-passthrough") instanceof UnmodifiableConfig)) {
       config.set("config-version", UPSTREAM_VERSION);
     }
 

@@ -73,6 +73,22 @@ comandos = [
 `comandos` is this fork's addition: every server listed there also gets a command named after it, so
 players can type `/lobby` instead of `/server lobby`. See [server-commands.md](server-commands.md).
 
+## Portals to another server
+
+A new configuration also sends the lobby's Nether and End portals to a server called `survival`:
+
+```toml
+[portales]
+lobby = {
+    nether = "survival",
+    end = "survival"
+}
+```
+
+Change the names to your own servers, leave out the line for a portal that should keep working as
+usual, or delete the entry to turn it off. A name missing from `[servers]` is reported at start-up
+and ignored, so the proxy starts either way. See [portal-redirects.md](portal-redirects.md).
+
 ## What is on by default
 
 **Offline players are accepted and must authenticate.** A player Mojang cannot verify is not
@@ -187,4 +203,5 @@ proxy, and should only be reachable from the proxy machine. Use `player-info-for
 
 - [offline-auth.md](offline-auth.md) — the register/login gate, its options and its limitations.
 - [server-commands.md](server-commands.md) — per-server shortcut commands and permissions.
+- [portal-redirects.md](portal-redirects.md) — Nether and End portals that lead to another server.
 - [hybrid-offline-profiles.md](hybrid-offline-profiles.md) — how offline identities are built.

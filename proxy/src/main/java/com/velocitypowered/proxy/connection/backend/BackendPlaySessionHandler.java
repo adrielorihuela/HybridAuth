@@ -37,14 +37,17 @@ import com.velocitypowered.api.proxy.messages.ChannelIdentifier;
 import com.velocitypowered.api.proxy.player.ResourcePackInfo;
 import com.velocitypowered.proxy.VelocityServer;
 import com.velocitypowered.proxy.command.CommandGraphInjector;
+import com.velocitypowered.proxy.config.VelocityConfiguration.PortalsConfig.Dimension;
 import com.velocitypowered.proxy.connection.MinecraftConnection;
 import com.velocitypowered.proxy.connection.MinecraftSessionHandler;
 import com.velocitypowered.proxy.connection.client.ClientPlaySessionHandler;
 import com.velocitypowered.proxy.connection.client.ConnectedPlayer;
 import com.velocitypowered.proxy.connection.player.resourcepack.VelocityResourcePackInfo;
 import com.velocitypowered.proxy.connection.player.resourcepack.handler.ResourcePackHandler;
+import com.velocitypowered.proxy.connection.registry.DimensionInfo;
 import com.velocitypowered.proxy.connection.util.ConnectionMessages;
 import com.velocitypowered.proxy.protocol.MinecraftPacket;
+import com.velocitypowered.proxy.protocol.ProtocolUtils;
 import com.velocitypowered.proxy.protocol.StateRegistry;
 import com.velocitypowered.proxy.protocol.netty.MinecraftDecoder;
 import com.velocitypowered.proxy.protocol.netty.MinecraftVarintFrameDecoder;
@@ -55,6 +58,7 @@ import com.velocitypowered.proxy.protocol.packet.ClientSettingsPacket;
 import com.velocitypowered.proxy.protocol.packet.ClientboundCookieRequestPacket;
 import com.velocitypowered.proxy.protocol.packet.ClientboundStoreCookiePacket;
 import com.velocitypowered.proxy.protocol.packet.DisconnectPacket;
+import com.velocitypowered.proxy.protocol.packet.JoinGamePacket;
 import com.velocitypowered.proxy.protocol.packet.KeepAlivePacket;
 import com.velocitypowered.proxy.protocol.packet.LegacyPlayerListItemPacket;
 import com.velocitypowered.proxy.protocol.packet.PluginMessagePacket;
@@ -62,6 +66,7 @@ import com.velocitypowered.proxy.protocol.packet.RemovePlayerInfoPacket;
 import com.velocitypowered.proxy.protocol.packet.RemoveResourcePackPacket;
 import com.velocitypowered.proxy.protocol.packet.ResourcePackRequestPacket;
 import com.velocitypowered.proxy.protocol.packet.ResourcePackResponsePacket;
+import com.velocitypowered.proxy.protocol.packet.RespawnPacket;
 import com.velocitypowered.proxy.protocol.packet.ServerDataPacket;
 import com.velocitypowered.proxy.protocol.packet.TabCompleteResponsePacket;
 import com.velocitypowered.proxy.protocol.packet.TransferPacket;
@@ -76,10 +81,12 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.handler.timeout.ReadTimeoutException;
 import java.net.InetSocketAddress;
+import java.util.Locale;
 import java.util.regex.Pattern;
 import net.kyori.adventure.key.Key;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * Handles a connected player.
@@ -93,6 +100,8 @@ public class BackendPlaySessionHandler implements MinecraftSessionHandler {
   private static final int MAXIMUM_PACKETS_TO_FLUSH =
       Integer.getInteger("velocity.max-packets-per-flush", 8192);
   private static final int LARGE_PACKET_THRESHOLD = 1024 * 128;
+  /** Only its class is used, to look up the respawn's packet id for a protocol version. */
+  private static final RespawnPacket RESPAWN = new RespawnPacket();
 
   private final VelocityServer server;
   private final VelocityServerConnection serverConn;
@@ -100,6 +109,7 @@ public class BackendPlaySessionHandler implements MinecraftSessionHandler {
   private final MinecraftConnection playerConnection;
   private final BungeeCordMessageResponder bungeecordMessageResponder;
   private boolean exceptionTriggered = false;
+  private boolean portalRedirected = false;
   private int packetsFlushed;
 
   BackendPlaySessionHandler(VelocityServer server, VelocityServerConnection serverConn) {
@@ -162,6 +172,13 @@ public class BackendPlaySessionHandler implements MinecraftSessionHandler {
   public boolean handle(KeepAlivePacket packet) {
     serverConn.getPendingPings().put(packet.getRandomId(), System.nanoTime());
     return false; // forwards on
+  }
+
+  @Override
+  public boolean handle(JoinGamePacket packet) {
+    // We receive this if the connection is reconfigured
+    packet.setOnlineMode(serverConn.getPlayer().isOnlineMode());
+    return false; // forward
   }
 
   @Override
@@ -396,6 +413,15 @@ public class BackendPlaySessionHandler implements MinecraftSessionHandler {
   }
 
   @Override
+  public boolean handle(RespawnPacket packet) {
+    // Velocity forwards a backend's respawn without decoding it -- it is registered encode-only --
+    // so today the packet arrives at handleUnknown instead, and that is where portals are caught.
+    // This covers the day an upstream merge starts decoding it, when handleUnknown stops seeing it.
+    redirectThroughPortal(portalDimension(packet));
+    return false;
+  }
+
+  @Override
   public boolean handle(TransferPacket packet) {
     final InetSocketAddress originalAddress = packet.address();
     if (originalAddress == null) {
@@ -467,6 +493,12 @@ public class BackendPlaySessionHandler implements MinecraftSessionHandler {
 
   @Override
   public void handleUnknown(ByteBuf buf) {
+    // Only servers listed in [portales] pay for the look; for the rest this is one map lookup.
+    if (!portalRedirected && server.getConfiguration().getPortalsConfig()
+        .redirectsFrom(serverConn.getServerInfo().getName())) {
+      redirectThroughPortal(
+          portalDimension(buf, serverConn.ensureConnected().getProtocolVersion()));
+    }
     boolean huge = buf.readableBytes() > LARGE_PACKET_THRESHOLD;
     playerConnection.delayedWrite(buf.retain());
     if (huge || ++packetsFlushed >= MAXIMUM_PACKETS_TO_FLUSH) {
@@ -521,5 +553,85 @@ public class BackendPlaySessionHandler implements MinecraftSessionHandler {
     }
 
     playerConnection.setAutoReading(writable);
+  }
+
+  /**
+   * Sends the player on if {@code [portales]} names a server for the dimension this server just
+   * moved them into. A backend has no way to tell the proxy that a player stepped into a portal,
+   * but it does have to tell the client that its dimension changed, and that is what this keys
+   * on. The respawn is still forwarded: if the target cannot be reached, the player is left
+   * consistently in this server's Nether or End rather than out of step with it.
+   */
+  private void redirectThroughPortal(final @Nullable Dimension dimension) {
+    if (dimension == null || portalRedirected) {
+      return;
+    }
+    final ConnectedPlayer player = serverConn.getPlayer();
+    final String origin = serverConn.getServerInfo().getName();
+    server.getConfiguration().getPortalsConfig()
+        .target(origin, dimension)
+        .flatMap(server::getServer)
+        .filter(target -> !target.getServerInfo().equals(serverConn.getServerInfo()))
+        .filter(target -> player.getConnectionInFlight() == null)
+        .ifPresent(target -> {
+          portalRedirected = true;
+          logger.info("{} entered the {} on {}, sending them to {}", player,
+              dimension.name().toLowerCase(Locale.ROOT), origin, target.getServerInfo().getName());
+          player.createConnectionRequest(target).fireAndForget();
+        });
+  }
+
+  /**
+   * Returns the dimension a raw packet moves the player into, if it is a respawn into the Nether or
+   * the End. {@code raw} starts at the packet id, as {@link #handleUnknown} receives it, and is
+   * left untouched.
+   */
+  static @Nullable Dimension portalDimension(final ByteBuf raw, final ProtocolVersion version) {
+    // A duplicate, so the packet is forwarded byte for byte whatever happens here.
+    final ByteBuf packet = raw.duplicate();
+    try {
+      final int id = ProtocolUtils.readVarInt(packet);
+      final int respawnId = StateRegistry.PLAY
+          .getProtocolRegistry(ProtocolUtils.Direction.CLIENTBOUND, version)
+          .getPacketId(RESPAWN);
+      if (id != respawnId) {
+        return null;
+      }
+      final RespawnPacket respawn = new RespawnPacket();
+      respawn.decode(packet, ProtocolUtils.Direction.CLIENTBOUND, version);
+      return portalDimension(respawn);
+    } catch (RuntimeException e) {
+      // Only a look at a packet on its way through: failing to read it must never stop it.
+      logger.debug("Could not read a packet to check it for a portal", e);
+      return null;
+    }
+  }
+
+  /**
+   * Returns the dimension a respawn moves the player into, if it is the Nether or the End.
+   *
+   * <p>From 1.16 the world is named by key, in the level name or, on 1.16.2 to 1.18.2, in the
+   * slot the dimension type uses elsewhere. Worlds created by plugins such as Multiverse are named
+   * after the world, so {@code lobby_nether} counts as well as {@code minecraft:the_nether}. Before
+   * 1.16 the dimension is a number.
+   */
+  static @Nullable Dimension portalDimension(final RespawnPacket packet) {
+    final DimensionInfo info = packet.getDimensionInfo();
+    if (info == null) {
+      return switch (packet.getDimension()) {
+        case -1 -> Dimension.NETHER;
+        case 1 -> Dimension.END;
+        default -> null;
+      };
+    }
+    final String key = (info.getLevelName() != null ? info.getLevelName()
+        : info.getRegistryIdentifier()).toLowerCase(Locale.ROOT);
+    if (key.equals("minecraft:the_nether") || key.endsWith("_nether")) {
+      return Dimension.NETHER;
+    }
+    if (key.equals("minecraft:the_end") || key.endsWith("_the_end")) {
+      return Dimension.END;
+    }
+    return null;
   }
 }

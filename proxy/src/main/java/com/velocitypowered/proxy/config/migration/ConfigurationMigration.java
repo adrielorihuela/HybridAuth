@@ -31,7 +31,8 @@ public sealed interface ConfigurationMigration
                 MiniMessageTranslationsMigration,
                 TransferIntegrationMigration,
                 PacketLimiterMigration,
-                OfflineAuthMigration {
+                OfflineAuthMigration,
+                PingPassthroughMigration {
   boolean shouldMigrate(CommentedFileConfig config);
 
   void migrate(CommentedFileConfig config, Logger logger) throws IOException;

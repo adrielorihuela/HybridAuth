@@ -33,6 +33,14 @@ Fork-specific behaviour:
 - **Per-server shortcut commands** (`command/builtin/ServerShortcutCommand.java`, registered
   from `VelocityServer#registerServerCommands`) — the `comandos` list in `[servers]`.
   See `docs/guide/server-commands.md`.
+- **Portal redirects** (`BackendPlaySessionHandler#handle(RespawnPacket)`, the `[portales]`
+  section) — a backend moving a player into the Nether or the End sends them to the configured
+  server instead. The respawn packet is still forwarded, so a failed connection leaves the player
+  consistent on the origin. **The backend's respawn is registered encode-only in `StateRegistry`**,
+  so it is never decoded: it reaches `handleUnknown` as a raw buffer and is read there.
+  `handle(RespawnPacket)` alone never fires, which is how 1.3.0-beta.1 shipped not working. The
+  section is written with multi-line inline tables, so the configuration is parsed as TOML 1.1
+  (`config/Toml11Format.java`). See `docs/guide/portal-redirects.md`.
 - **Plugin auto-update** (`plugin/update/`, the `[plugins]` section) — listed plugins are
   downloaded and updated in parallel from Hangar, Modrinth, GitHub, GeyserMC and LuckPerms,
   immediately before `loadPlugins()`. See `docs/guide/getting-started.md`.
@@ -123,13 +131,16 @@ release; `HybridAuth-<forkVersion>-thin.jar` is not runnable and only feeds `sha
 
 Two versions coexist, and they are not interchangeable:
 
-- `version` in `gradle.properties` (`4.1.1`) is the **upstream Velocity API version**.
+- `version` in `gradle.properties` (`4.2.1-SNAPSHOT`) is the **upstream Velocity API version**.
   It sets the Maven coordinates of `velocity-api`, so plugins compile against it — do not bump
   it to express a fork release.
 - `forkName` / `forkVersion` in `gradle.properties` name the **fork's distributable**. The
   proxy's `shadowJar` uses them for the archive name and manifest, and `VelocityServer#getVersion`
   reads that manifest, which is why the proxy logs `Booting up HybridAuth <forkVersion>`.
-  Bump `forkVersion` for a fork release and tag it `v<forkVersion>`.
+  Bump `forkVersion` for a fork release; `.github/workflows/release.yml` tags `v<forkVersion>` and
+  publishes the release itself once the bump reaches `main`, with `docs/releases/<forkVersion>.md`
+  as its notes, and removes the `<forkVersion>-*` pre-releases it replaces. A hyphenated version is
+  a pre-release and can be published from any branch, for testing before a merge.
 
 ### Java 25 is a hard requirement
 

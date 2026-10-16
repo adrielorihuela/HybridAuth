@@ -108,6 +108,20 @@ Full details: [docs/guide/getting-started.md](docs/guide/getting-started.md).
 **A command per server.** List a server under `comandos` and players get `/lobby` instead of
 `/server lobby`, permission-controlled per server.
 
+**Portals that lead to another server.** Step into the End portal in your lobby and arrive on
+survival. One entry per server, one line per dimension, and only the dimensions you list need
+enabling there:
+
+```toml
+[portales]
+lobby = {
+    nether = "survival",
+    end = "survival"
+}
+```
+
+Details: [docs/guide/portal-redirects.md](docs/guide/portal-redirects.md).
+
 **Everything else is Velocity.** Same plugin API, same performance, same configuration. Works with
 ViaVersion, ViaBackwards, ViaRewind, Geyser, Floodgate, LuckPerms and every other Velocity plugin.
 
@@ -117,7 +131,7 @@ Download `HybridAuth-<version>.jar` from the
 [releases](https://github.com/adrielorihuela/HybridAuth/releases) and run it:
 
 ```bash
-java -Xms512M -Xmx512M -jar HybridAuth-1.2.1.jar
+java -Xms512M -Xmx512M -jar HybridAuth-1.3.0.jar
 ```
 
 Java 25 is required.

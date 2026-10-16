@@ -33,6 +33,7 @@ import com.velocitypowered.proxy.config.migration.MiniMessageTranslationsMigrati
 import com.velocitypowered.proxy.config.migration.MotdMigration;
 import com.velocitypowered.proxy.config.migration.OfflineAuthMigration;
 import com.velocitypowered.proxy.config.migration.PacketLimiterMigration;
+import com.velocitypowered.proxy.config.migration.PingPassthroughMigration;
 import com.velocitypowered.proxy.config.migration.TransferIntegrationMigration;
 import com.velocitypowered.proxy.plugin.update.PluginUpdater;
 import com.velocitypowered.proxy.util.AddressUtil;
@@ -44,12 +45,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.SecureRandom;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -81,7 +84,7 @@ public class VelocityConfiguration implements ProxyConfig {
   @Expose
   private boolean onlineModeKickExistingPlayers = false;
   @Expose
-  private PingPassthroughMode pingPassthrough = PingPassthroughMode.DISABLED;
+  private PingPassthroughMode pingPassthrough = PingPassthroughMode.DEFAULT;
   @Expose
   private boolean samplePlayersInPing = false;
   private final Servers servers;
@@ -93,7 +96,7 @@ public class VelocityConfiguration implements ProxyConfig {
   private final Metrics metrics;
   @Expose
   private boolean enablePlayerAddressLogging = true;
-  private net.kyori.adventure.text.@MonotonicNonNull Component motdAsComponent;
+  private @MonotonicNonNull Component motdAsComponent;
   private @Nullable Favicon favicon;
   @Expose
   private boolean forceKeyAuthentication = true; // Added in 1.19
@@ -103,6 +106,8 @@ public class VelocityConfiguration implements ProxyConfig {
   private OfflineAuthConfig offlineAuthConfig = OfflineAuthConfig.DEFAULT;
   @Expose
   private PluginsConfig pluginsConfig = PluginsConfig.DEFAULT;
+  @Expose
+  private PortalsConfig portalsConfig = PortalsConfig.DEFAULT;
 
   private VelocityConfiguration(Servers servers, ForcedHosts forcedHosts, Advanced advanced,
       Query query, Metrics metrics) {
@@ -120,7 +125,8 @@ public class VelocityConfiguration implements ProxyConfig {
       boolean samplePlayersInPing, boolean enablePlayerAddressLogging, Servers servers,
       ForcedHosts forcedHosts, Advanced advanced, Query query, Metrics metrics,
       boolean forceKeyAuthentication, PacketLimiterConfig packetLimiterConfig,
-      OfflineAuthConfig offlineAuthConfig, PluginsConfig pluginsConfig) {
+      OfflineAuthConfig offlineAuthConfig, PluginsConfig pluginsConfig,
+      PortalsConfig portalsConfig) {
     this.bind = bind;
     this.motd = motd;
     this.showMaxPlayers = showMaxPlayers;
@@ -142,6 +148,7 @@ public class VelocityConfiguration implements ProxyConfig {
     this.packetLimiterConfig = packetLimiterConfig;
     this.offlineAuthConfig = offlineAuthConfig;
     this.pluginsConfig = pluginsConfig;
+    this.portalsConfig = portalsConfig;
   }
 
   /**
@@ -211,6 +218,29 @@ public class VelocityConfiguration implements ProxyConfig {
         logger.error("Server command '{}' has no matching server in [servers]. Add it there, or "
             + "remove it from 'comandos'.", s);
         valid = false;
+      }
+    }
+
+    // Warnings, not errors: [portales] ships switched on and names `survival`, which the shipped
+    // [servers] does not have, so refusing to start here would stop every fresh installation. An
+    // entry naming an unknown server simply never fires.
+    for (Map.Entry<String, Map<PortalsConfig.Dimension, String>> origin
+        : portalsConfig.redirects().entrySet()) {
+      if (servers.getServers().keySet().stream().noneMatch(origin.getKey()::equalsIgnoreCase)) {
+        logger.warn("[portales] '{}' has no matching server in [servers]; its portals work as "
+            + "usual.", origin.getKey());
+        continue;
+      }
+      for (Map.Entry<PortalsConfig.Dimension, String> target : origin.getValue().entrySet()) {
+        final String dimension = target.getKey().name().toLowerCase(Locale.ROOT);
+        if (servers.getServers().keySet().stream().noneMatch(target.getValue()::equalsIgnoreCase)) {
+          logger.warn("[portales] '{}' sends its {} to '{}', which has no matching server in "
+              + "[servers]; that portal works as usual.", origin.getKey(), dimension,
+              target.getValue());
+        } else if (target.getValue().equalsIgnoreCase(origin.getKey())) {
+          logger.warn("[portales] '{}' sends its {} to itself; that portal works as usual.",
+              origin.getKey(), dimension);
+        }
       }
     }
 
@@ -328,7 +358,7 @@ public class VelocityConfiguration implements ProxyConfig {
   }
 
   @Override
-  public net.kyori.adventure.text.Component getMotd() {
+  public Component getMotd() {
     if (motdAsComponent == null) {
       motdAsComponent = MiniMessage.miniMessage().deserialize(motd);
     }
@@ -394,6 +424,16 @@ public class VelocityConfiguration implements ProxyConfig {
    */
   public PluginsConfig getPluginsConfig() {
     return pluginsConfig;
+  }
+
+  /**
+   * Returns which servers send players elsewhere through their portals, from the
+   * {@code [portales]} section.
+   *
+   * @return the portal redirect configuration
+   */
+  public PortalsConfig getPortalsConfig() {
+    return portalsConfig;
   }
 
   @Override
@@ -549,6 +589,7 @@ public class VelocityConfiguration implements ProxyConfig {
         .add("packetLimiterConfig", packetLimiterConfig)
         .add("offlineAuthConfig", offlineAuthConfig)
         .add("pluginsConfig", pluginsConfig)
+        .add("portalsConfig", portalsConfig)
         .toString();
   }
 
@@ -592,7 +633,8 @@ public class VelocityConfiguration implements ProxyConfig {
       Files.createFile(githubTokenPath);
     }
 
-    try (final CommentedFileConfig config = CommentedFileConfig.builder(path)
+    // TOML 1.1, for the multi-line inline tables [portales] is written with. See Toml11Format.
+    try (final CommentedFileConfig config = CommentedFileConfig.builder(path, Toml11Format.INSTANCE)
             .defaultData(defaultConfigLocation)
             .autosave()
             .preserveInsertionOrder()
@@ -608,7 +650,8 @@ public class VelocityConfiguration implements ProxyConfig {
           new MiniMessageTranslationsMigration(),
           new TransferIntegrationMigration(),
           new PacketLimiterMigration(),
-          new OfflineAuthMigration()
+          new OfflineAuthMigration(),
+          new PingPassthroughMigration()
       };
 
       for (final ConfigurationMigration migration : migrations) {
@@ -652,11 +695,10 @@ public class VelocityConfiguration implements ProxyConfig {
       final OfflineAuthConfig offlineAuthConfig =
               OfflineAuthConfig.fromConfig(config.get("offline-auth"));
       final PluginsConfig pluginsConfig = PluginsConfig.fromConfig(config.get("plugins"));
+      final PortalsConfig portalsConfig = PortalsConfig.fromConfig(config.get("portales"));
       final PlayerInfoForwarding forwardingMode = config.getEnumOrElse(
               "player-info-forwarding-mode", PlayerInfoForwarding.NONE);
-      final PingPassthroughMode pingPassthroughMode = config.getEnumOrElse("ping-passthrough",
-              PingPassthroughMode.DISABLED);
-
+      final PingPassthroughMode pingPassthrough = PingPassthroughMode.fromConfig(config.get("ping-passthrough"));
       final boolean samplePlayersInPing = config.getOrElse("sample-players-in-ping", false);
 
       final String bind = config.getOrElse("bind", "0.0.0.0:25565");
@@ -689,7 +731,7 @@ public class VelocityConfiguration implements ProxyConfig {
               forwardingMode,
               forwardingSecret,
               kickExisting,
-              pingPassthroughMode,
+              pingPassthrough,
               samplePlayersInPing,
               enablePlayerAddressLogging,
               new Servers(serversConfig),
@@ -700,7 +742,8 @@ public class VelocityConfiguration implements ProxyConfig {
               forceKeyAuthentication,
               packetLimiterConfig,
               offlineAuthConfig,
-              pluginsConfig
+              pluginsConfig,
+              portalsConfig
       );
     }
   }
@@ -798,7 +841,7 @@ public class VelocityConfiguration implements ProxyConfig {
      * @param name the server name to clean
      * @return the cleaned server name
      */
-    private String cleanServerName(String name) {
+    private static String cleanServerName(String name) {
       return name.replace("\"", "");
     }
 
@@ -1181,6 +1224,82 @@ public class VelocityConfiguration implements ProxyConfig {
           .map(String::trim)
           .filter(name -> !name.isEmpty())
           .toList();
+    }
+  }
+
+  /**
+   * Servers whose Nether and End portals send players to another server instead. Keys are the
+   * origin server names, lowercased; a missing section redirects nothing.
+   *
+   * @param redirects the target server for each dimension, per origin server
+   */
+  public record PortalsConfig(Map<String, Map<Dimension, String>> redirects) {
+
+    public static final PortalsConfig DEFAULT = new PortalsConfig(Map.of());
+
+    /** The dimensions a portal can lead to. */
+    public enum Dimension {
+      NETHER("nether"),
+      END("end");
+
+      private final String key;
+
+      Dimension(final String key) {
+        this.key = key;
+      }
+    }
+
+    /**
+     * Returns a PortalsConfig from a config section, or the default if the section is null.
+     *
+     * @param config the configuration section to parse
+     * @return the portals config, or the default if {@code config} is null
+     */
+    public static PortalsConfig fromConfig(CommentedConfig config) {
+      if (config == null) {
+        return DEFAULT;
+      }
+      final Map<String, Map<Dimension, String>> redirects = new HashMap<>();
+      for (UnmodifiableConfig.Entry entry : config.entrySet()) {
+        if (!(entry.getValue() instanceof UnmodifiableConfig targets)) {
+          throw new IllegalArgumentException("[portales] entry " + entry.getKey()
+              + " must be a table, like { nether = \"survival\", end = \"survival\" }");
+        }
+        final Map<Dimension, String> byDimension = new EnumMap<>(Dimension.class);
+        for (Dimension dimension : Dimension.values()) {
+          final Object target = targets.get(dimension.key);
+          if (target instanceof String name && !name.isBlank()) {
+            byDimension.put(dimension, Servers.cleanServerName(name.trim()));
+          }
+        }
+        if (!byDimension.isEmpty()) {
+          redirects.put(Servers.cleanServerName(entry.getKey()).toLowerCase(Locale.ROOT),
+              Map.copyOf(byDimension));
+        }
+      }
+      return new PortalsConfig(Map.copyOf(redirects));
+    }
+
+    /**
+     * Returns whether any portal on {@code origin} sends players elsewhere.
+     *
+     * @param origin the server the player is on
+     * @return whether {@code origin} has an entry
+     */
+    public boolean redirectsFrom(final String origin) {
+      return redirects.containsKey(origin.toLowerCase(Locale.ROOT));
+    }
+
+    /**
+     * Returns the server a portal on {@code origin} leading to {@code dimension} sends players to.
+     *
+     * @param origin the server the player is on
+     * @param dimension the dimension the portal leads to
+     * @return the target server name, if one is configured
+     */
+    public Optional<String> target(final String origin, final Dimension dimension) {
+      final Map<Dimension, String> targets = redirects.get(origin.toLowerCase(Locale.ROOT));
+      return targets == null ? Optional.empty() : Optional.ofNullable(targets.get(dimension));
     }
   }
 
