@@ -15,7 +15,8 @@ mistake being made twice.
 | --- | --- |
 | `docs/guide/` | How an operator uses the fork. Start at `docs/guide/getting-started.md`. |
 | `docs/development/README.md` | Why the fork is built this way: the specification, the attempt that failed, the protocol research, the architecture chosen. |
-| `docs/development/updating-upstreams.md` | **How to pull changes from Velocity or NanoLimbo.** Read this before any upstream work — merging and rebasing are not interchangeable here. |
+| `docs/development/updating-upstreams.md` | **How to pull changes from Velocity or NanoLimbo.** Read this before any upstream work — merging and rebasing are not interchangeable here. It runs weekly by itself; this page also says what to do when it stops for review. |
+| `docs/development/releasing.md` | **How releases happen**: every change reaching `main` is released, with the version taken from the commit subjects. Read it before choosing a commit subject or bumping `forkVersion`. |
 | `docs/development/auth-server.md` | The vendored subtree, its three local patches, and why each exists. |
 
 Fork-specific behaviour:
@@ -109,7 +110,8 @@ Apply formatting — run before committing, the build fails on style violations.
 ./gradlew updateUpstreams
 ```
 
-Update both upstreams: adds the `upstream` and `limbo-upstream` remotes if a clone is missing them,
+Update both upstreams by hand (the weekly workflow runs this same task; see **Releases and upstream
+updates run themselves**): adds the `upstream` and `limbo-upstream` remotes if a clone is missing them,
 merges Velocity, pulls the NanoLimbo subtree with the flags it requires, and prints what to check
 afterwards. Both fetches pass `--no-tags`, which is load-bearing: NanoLimbo numbers its releases
 the way this fork does, and a plain fetch imported twenty-two of its tags including a `v1.2.1` that
@@ -137,10 +139,8 @@ Two versions coexist, and they are not interchangeable:
 - `forkName` / `forkVersion` in `gradle.properties` name the **fork's distributable**. The
   proxy's `shadowJar` uses them for the archive name and manifest, and `VelocityServer#getVersion`
   reads that manifest, which is why the proxy logs `Booting up HybridAuth <forkVersion>`.
-  Bump `forkVersion` for a fork release; `.github/workflows/release.yml` tags `v<forkVersion>` and
-  publishes the release itself once the bump reaches `main`, with `docs/releases/<forkVersion>.md`
-  as its notes, and removes the `<forkVersion>-*` pre-releases it replaces. A hyphenated version is
-  a pre-release and can be published from any branch, for testing before a merge.
+  The release workflow sets `forkVersion` itself; bump it by hand only to release with
+  hand-written notes. See **Releases and upstream updates run themselves** below.
 
 ### Java 25 is a hard requirement
 
@@ -150,6 +150,43 @@ compiled with `options.release = 8` that is the jar's `Main-Class`: it loads any
 `java.specification.version` and explains the problem instead of letting the classloader throw
 `UnsupportedClassVersionError`. It reaches the real entry point by reflection so the Java 25 classes
 are not linked before the check passes, and it must stay free of anything newer than Java 8.
+
+## Releases and upstream updates run themselves
+
+Two workflows do what used to be done by hand. Know what they do before pushing to `main`, because
+**a push to `main` is a release**.
+
+**`.github/workflows/release.yml` releases every change that reaches `main`** — a merged pull
+request, a direct push — except one touching only `docs/`, `.md` files or `.github/`, whose jar would
+be identical. The version comes from the commit subjects since the last stable tag: `feat:` is a
+minor, `type!:` or `BREAKING CHANGE` a major, anything else a patch. So the subject you write *is*
+the version decision: use `feat:` for a feature, and never `feat:` for a fix. It builds first, then
+commits `forkVersion` and the notes (from `docs/releases/TEMPLATE.md`) back to `main` as
+`chore: release <version>`, tags, and publishes the jar.
+
+To release with **hand-written notes** — anything an operator should read about — put
+`docs/releases/<version>.md` and `forkVersion=<version>` in the same pull request; that version and
+those notes are used as they are. A hyphenated `forkVersion` (`1.4.0-beta.1`) on any branch is a
+pre-release for testing before a merge, deleted when its stable version comes out. Full detail:
+`docs/development/releasing.md`.
+
+**`.github/workflows/upstream.yml` merges Velocity and NanoLimbo every Monday.** It resolves the one
+mechanical conflict (`gradle.properties` / `libs.versions.toml`, key by key), runs the review checks
+in `.github/scripts/review-checks.sh`, builds, starts the jar, and — only if all of that passes —
+pushes to `main` and releases a patch with notes from `docs/releases/TEMPLATE-upstream.md` saying it
+was automatic. Otherwise nothing reaches `main`: the merge waits on `upstream-update/<date>` with
+drafted notes, and an issue labelled `upstream-update` says what needs judgment.
+
+**When asked to resolve an upstream update**, follow "When it stops for review" in
+`docs/development/updating-upstreams.md`: deal with every reason in the issue, replace every
+`MANUAL` comment in `docs/releases/<version>.md` with what was found and what was done, build and
+start the jar, and merge into `main` through a pull request from the session branch. The release
+then goes out with those notes.
+
+Pushes made with `GITHUB_TOKEN` start no workflow — that is why the release commit cannot loop, and
+why `upstream.yml` starts `release.yml` with `workflow_dispatch`. The scripts in `.github/scripts/`
+run locally too; test a change to one against real history before pushing it (the 4.2.0 merge,
+`84bd8cc`, is the case that exercises every check).
 
 ## Architecture
 
