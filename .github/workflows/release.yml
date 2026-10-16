@@ -1,21 +1,39 @@
-# Publishes a GitHub release, with the runnable proxy jar attached, whenever forkVersion names a
-# version that has no release yet. A version with a hyphen in it (1.3.0-beta.1) is published as a
-# pre-release, and a stable version only ever from main. Publishing X.Y.Z deletes the X.Y.Z-*
-# pre-releases it replaces. Notes come from docs/releases/<version>.md when that file exists.
+# Publishes a GitHub release, with the runnable proxy jar and its notes, for every change that reaches
+# main. How it works and how to use it: docs/development/releasing.md.
 #
-# It runs on a pushed v* tag, and also on a branch push that changes gradle.properties (or this file),
-# in which case it creates the v<forkVersion> tag itself. The second path exists because not every place a
-# release is cut from can push tags; bumping forkVersion is what a release commit does anyway.
+#   - A push or merge to main that changes anything other than documentation or CI is released.
+#     The version comes from the commits since the last release (feat: -> minor, ! or BREAKING
+#     CHANGE -> major, anything else -> patch), the notes from docs/releases/TEMPLATE.md, and both
+#     are committed back to main as `chore: release <version>` before the tag is created.
+#   - If forkVersion in gradle.properties already names an unreleased version, that version is
+#     released as it is, with docs/releases/<version>.md as its notes when that file exists. That is
+#     how a release with hand-written notes is cut.
+#   - A hyphenated forkVersion (1.4.0-beta.1) is a pre-release, from any branch, for trying a build
+#     before it is merged. Publishing X.Y.Z deletes the X.Y.Z-* pre-releases it replaces.
+#   - A pushed v* tag releases that tag, which must match forkVersion.
+#
+# The release commit is pushed with GITHUB_TOKEN, and GitHub starts no workflow for such pushes,
+# so it cannot trigger itself. For the same reason the upstream workflow starts this one with
+# workflow_dispatch after pushing to main.
 
 name: Release
 on:
   push:
-    tags: ['v*']
     branches: ['**']
-    paths: ['gradle.properties', '.github/workflows/release.yml']
+    tags: ['v*']
+    # Documentation, CI and git's own settings leave the jar identical, so they are released with the next real change
+    # rather than on their own. Path filters do not apply to tag pushes.
+    paths-ignore: ['docs/**', '**/*.md', '.github/**', '.gitignore', '.gitattributes']
+  workflow_dispatch:
 
 permissions:
   contents: write
+
+# One release at a time, and never cancelled halfway: a second push waits for the first to finish
+# and then sees its tag.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -24,74 +42,91 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v6
       with:
-        persist-credentials: false
-    # The jar is named after forkVersion, not the tag. A tag pushed without bumping it would
-    # publish the previous release's jar under the new name, so refuse instead. On a branch push,
-    # a version that already has its tag is not a release, so stop quietly.
+        fetch-depth: 0
+    # A release from main is cut from main as it is now, not from the commit that started this run:
+    # if two pushes queued up, the first run's release commit is already there for the second.
+    - name: Move to the tip of main
+      if: github.ref == 'refs/heads/main'
+      run: |
+        git fetch --tags origin main
+        git checkout -B main origin/main
     - name: Work out the version
       id: version
-      env:
-        GH_TOKEN: ${{ github.token }}
       run: |
-        version="$(grep '^forkVersion=' gradle.properties | cut -d= -f2)"
-        echo "version=${version}" >> "$GITHUB_OUTPUT"
-        if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
-            echo "::error::Tag ${GITHUB_REF_NAME} does not match forkVersion=${version} in gradle.properties."
-            exit 1
-          fi
-          echo "release=true" >> "$GITHUB_OUTPUT"
-        elif gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v${version}" > /dev/null 2>&1; then
-          echo "v${version} already exists; nothing to release."
-          echo "release=false" >> "$GITHUB_OUTPUT"
-        elif [[ "${version}" != *-* && "${GITHUB_REF}" != "refs/heads/main" ]]; then
-          # A release commit is pushed to its branch before it is merged. Stable releases come from
-          # main, so the version that ships is the one that was merged; pre-releases can come from
-          # anywhere, since testing them before merging is their point.
-          echo "${version} is a stable version on ${GITHUB_REF_NAME}; it is released from main."
-          echo "release=false" >> "$GITHUB_OUTPUT"
-        else
-          echo "release=true" >> "$GITHUB_OUTPUT"
-        fi
+        .github/scripts/next-version.sh "${GITHUB_REF_TYPE}" "${GITHUB_REF_NAME}" | tee -a "$GITHUB_OUTPUT"
     - name: Set up Gradle
-      if: steps.version.outputs.release == 'true'
+      if: steps.version.outputs.mode != 'none'
       uses: gradle/actions/setup-gradle@v5
     - name: Set up JDK 25
-      if: steps.version.outputs.release == 'true'
+      if: steps.version.outputs.mode != 'none'
       uses: actions/setup-java@v5
       with:
         java-version: 25
         distribution: 'zulu'
+    - name: Set the version
+      if: steps.version.outputs.mode == 'auto'
+      run: sed -i "s/^forkVersion=.*/forkVersion=${{ steps.version.outputs.version }}/" gradle.properties
+    # Before anything is committed or tagged: a version that does not build is not released, and
+    # main is left exactly as it was.
     - name: Build with Gradle
-      if: steps.version.outputs.release == 'true'
+      if: steps.version.outputs.mode != 'none'
       run: ./gradlew build
-    # Hand-written notes in docs/releases/<version>.md when there are any, GitHub's generated list
-    # of commits otherwise.
-    - name: Find release notes
+    - name: Write the release notes
       id: notes
-      if: steps.version.outputs.release == 'true'
+      if: steps.version.outputs.mode != 'none'
+      env:
+        VERSION: ${{ steps.version.outputs.version }}
+        PREVIOUS: ${{ steps.version.outputs.previous }}
+        BUMP_REASON: ${{ steps.version.outputs.bump }}, because of ${{ steps.version.outputs.bump_reason }}
       run: |
-        notes="docs/releases/${{ steps.version.outputs.version }}.md"
-        if [ -f "${notes}" ]; then
-          echo "path=${notes}" >> "$GITHUB_OUTPUT"
+        notes="docs/releases/${VERSION}.md"
+        if [ ! -f "${notes}" ]; then
+          reason=""
+          if [ "${{ steps.version.outputs.mode }}" = "auto" ]; then reason="${BUMP_REASON}"; fi
+          python3 -I .github/scripts/render-notes.py release --version "${VERSION}" \
+            --previous "${PREVIOUS}" --repo "${GITHUB_REPOSITORY}" --bump-reason "${reason}" \
+            > "${notes}"
         fi
+        echo "path=${notes}" >> "$GITHUB_OUTPUT"
+    # The version and its notes go back to main, so gradle.properties always names the version that
+    # is out and docs/releases/ keeps every release's notes.
+    - name: Commit the release to main
+      if: steps.version.outputs.mode == 'auto'
+      env:
+        VERSION: ${{ steps.version.outputs.version }}
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add gradle.properties "docs/releases/${VERSION}.md"
+        git commit -m "chore: release ${VERSION}" \
+          -m "Released automatically from the commits since ${{ steps.version.outputs.previous }}." \
+          -m "${{ steps.version.outputs.reason }}"
+        if ! git push origin HEAD:main; then
+          echo "::error::Could not push the release commit to main. If main is protected, allow github-actions to push to it; if main moved, the run for that push releases it."
+          exit 1
+        fi
+    # The exact commit that was built (and, for an automatic release, just committed), so a push
+    # landing meanwhile cannot end up under this tag.
+    - name: Pin the commit
+      id: commit
+      if: steps.version.outputs.mode != 'none'
+      run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
     # Only the runnable jar: HybridAuth-<version>-thin.jar exists to feed shadowJar and does not start.
     - name: Publish release
-      if: steps.version.outputs.release == 'true'
+      if: steps.version.outputs.mode != 'none'
       uses: softprops/action-gh-release@v2
       with:
         tag_name: v${{ steps.version.outputs.version }}
-        target_commitish: ${{ github.sha }}
+        target_commitish: ${{ steps.commit.outputs.sha }}
         name: HybridAuth ${{ steps.version.outputs.version }}
         files: proxy/build/libs/HybridAuth-${{ steps.version.outputs.version }}.jar
         prerelease: ${{ contains(steps.version.outputs.version, '-') }}
         body_path: ${{ steps.notes.outputs.path }}
-        generate_release_notes: ${{ steps.notes.outputs.path == '' }}
         fail_on_unmatched_files: true
     # A stable X.Y.Z replaces the X.Y.Z-beta.N builds that led to it; leaving them up only offers
     # people an older copy of the same version. Releases and their tags both go.
     - name: Remove the pre-releases this release replaces
-      if: steps.version.outputs.release == 'true' && !contains(steps.version.outputs.version, '-')
+      if: steps.version.outputs.mode != 'none' && !contains(steps.version.outputs.version, '-')
       env:
         GH_TOKEN: ${{ github.token }}
         VERSION: ${{ steps.version.outputs.version }}

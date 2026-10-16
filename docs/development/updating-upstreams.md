@@ -9,6 +9,59 @@ rediscover it.
 | `upstream` | [PaperMC/Velocity](https://github.com/PaperMC/Velocity) | The proxy itself — almost the whole tree | Merged into `main` |
 | `limbo-upstream` | [Nan1t/NanoLimbo](https://github.com/Nan1t/NanoLimbo) | The authentication server, at `limbo/upstream/` | `git subtree pull` |
 
+## It runs by itself
+
+`.github/workflows/upstream.yml` does all of this every Monday, and on demand from Actions →
+*Upstream update* → *Run workflow*. It does what can be done with certainty and stops, without
+touching `main`, at the first thing that needs judgment.
+
+| Step | Automatic | Stops for review when |
+| --- | --- | --- |
+| Merge Velocity and pull NanoLimbo, through the Gradle tasks below | yes | — |
+| Conflicts in `gradle.properties` / `libs.versions.toml` | resolved key by key (`resolve-known-conflicts.py`) | any other file conflicts, or those two hold anything but `key = value` changes both sides made differently |
+| Review checks (`review-checks.sh`) | run | `config-version` moved; a new Minecraft version; the gate's events changed; new `getAllServers()` callers; upstream touched `.github/`; the respawn stopped being encode-only; NanoLimbo changed at all |
+| `./gradlew build` | run | it fails |
+| Start the jar (`smoke-test.sh`) | run | no boot line, no authentication server, or no `Done` |
+| Release | the next **patch**, with notes from `docs/releases/TEMPLATE-upstream.md` saying it was automatic and why that was safe | — |
+
+When every row passes, the merge goes to `main` with `chore: release <version> (automatic upstream
+update)`, and `release.yml` publishes it. Nobody is involved, and the notes say so.
+
+When any row stops it, **nothing reaches `main`**:
+
+- If the merge finished, it is pushed to an `upstream-update/<date>` branch with `forkVersion`
+  already bumped and `docs/releases/<version>.md` drafted in manual mode: the commits and the
+  reasons are filled in, and `MANUAL` comments mark what is left to write.
+- If it conflicted, nothing is kept: a merge with conflict markers is not pushed anywhere.
+- An issue labelled **`upstream-update`** lists the reasons, the run, the branch and the steps
+  below. A later run that goes through closes it as superseded.
+
+Each check exists because that change has broken this fork, or would have, while the build stayed
+green. The sections further down say why for each.
+
+### When it stops for review
+
+This is the part for a person, or for Claude. Asked to "resolve the upstream update", Claude:
+
+1. **Reads the issue.** Every reason it lists has to be dealt with; none is a formality.
+2. **Gets the merge.** From the `upstream-update/<date>` branch if there is one. If the update
+   conflicted, on an up-to-date `main`: `./gradlew updateUpstreams`, and resolve the conflicts as
+   [When conflicts appear](#when-conflicts-appear) says — keep both sides.
+3. **Deals with each reason**, using this page and the one it points to. For example: a moved
+   `config-version` means reading `OfflineAuthMigration`'s hand-back against the new number, as
+   [After merging](#after-merging) describes; a new Minecraft version means checking whether
+   NanoLimbo supports it yet.
+4. **Finishes the notes** in `docs/releases/<version>.md`: replaces every `MANUAL` comment with what
+   was found and what was done, and rewrites anything in the draft that is no longer true. The
+   result should read like 1.3.0's notes, not like a log.
+5. **Verifies**: `./gradlew build`, then starts the jar and watches for the boot line and
+   `[auth]: Server started on /127.0.0.1:30065`.
+6. **Merges into `main`** — a merge, never a squash or a rebase, for the reasons below. `release.yml`
+   sees the bumped `forkVersion` and releases it with those notes. Then the issue is closed.
+
+Claude's sessions can only push to their own branch, so the merge into `main` goes through a pull
+request from that branch.
+
 ## The short version
 
 ```bash
@@ -206,16 +259,6 @@ would rewrite NanoLimbo's GPL copyright notices to "Velocity Contributors".
 
 ## Releasing after an update
 
-1. Bump `forkVersion` in `gradle.properties`. Leave `version` alone — it is the upstream Velocity
-   API version that plugins compile against.
-2. `./gradlew build`, then run the shaded jar and check the boot line and the authentication server.
-3. Write the release notes in `docs/releases/<forkVersion>.md`, in the shape of the earlier ones:
-   what is new and why, what came from upstream, what the fork fixed, how to upgrade.
-4. Get the bump onto `main`. `.github/workflows/release.yml` sees `forkVersion` change, builds,
-   creates the `v<forkVersion>` tag and the release with `HybridAuth-<forkVersion>.jar` and those
-   notes, and deletes the `<forkVersion>-*` pre-releases it replaces. Pushing a `v<forkVersion>` tag
-   by hand still works.
-
-A version with a hyphen (`1.3.0-beta.1`) is published as a pre-release, from any branch, which is
-how a build is tried on a live server before it is merged. A stable version is only ever released
-from `main`.
+Nothing to do by hand: merging the update into `main` releases it. See
+[releasing.md](releasing.md) for how the version and the notes are chosen, and for writing the
+notes yourself, which an update that needed review should always get.
