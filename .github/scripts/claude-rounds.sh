@@ -26,7 +26,8 @@
 #   CLAUDE_CMD                        default: npx -y @anthropic-ai/claude-code
 #   VERIFY_BUILD, VERIFY_SMOKE        passed through to verify-resolution.sh (for testing)
 # Reads <work dir>/reasons.txt, conflicts.txt, resolved.txt and initial-failure.txt (optional).
-# Writes <work dir>/claude/: result (passed | failed | needs-human | unresolved-conflict), rounds,
+# Writes <work dir>/claude/: result (passed | failed | needs-human | unresolved-conflict |
+# auth-failed), rounds,
 # report.md (for the issue), out/verdict.json, and per call its prompt, Claude's output and the
 # verification logs.
 set -euo pipefail
@@ -73,6 +74,30 @@ run_claude() {
   set -e
   echo "::endgroup::"
   echo "claude-rounds: Claude exited with ${status}"
+  if [ "${status}" -ne 0 ] && grep -Eiq \
+      'invalid api key|authentication_error|oauth token|token (has )?expired|login expired|please run /login|not logged in|\b401\b' "$2"; then
+    auth_failed "$2"
+  fi
+}
+
+# Claude never started working because the token was refused. Not a round, and not something a
+# retry fixes: the token has to be renewed, and the issue says how.
+auth_failed() {
+  echo 0 > "${dir}/rounds"
+  {
+    echo "Claude could not start: the \`CLAUDE_CODE_OAUTH_TOKEN\` secret was refused. Tokens from"
+    echo "\`claude setup-token\` last one year, so it has most likely expired. To renew it:"
+    echo
+    echo "1. On a computer with Claude Code, logged in with a Pro/Max plan, run \`claude setup-token\`."
+    echo "2. Settings -> Secrets and variables -> Actions -> \`CLAUDE_CODE_OAUTH_TOKEN\` -> Update."
+    echo "3. Actions -> Claude token check -> Run workflow, to confirm; then Actions -> Upstream update"
+    echo "   -> Run workflow with force, or resolve this update by hand."
+    echo
+    echo '```'
+    tail -n 15 "$1"
+    echo '```'
+  } > "${dir}/report.md"
+  finish auth-failed
 }
 
 # The part of the prompt that is about this run. $1 is what the call is for: conflict or resolve.

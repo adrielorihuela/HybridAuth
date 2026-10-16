@@ -337,6 +337,7 @@ jobs:
               needs-human) echo "Claude decided at least one reason needs a person, and said why:" ;;
               failed) echo "Claude's resolution did not pass in $(cat "${WORK}/claude/rounds" 2>/dev/null || echo 3) round(s). Its commits are on the branch below, as a starting point." ;;
               unresolved-conflict) echo "Claude could not conclude the conflicted merge." ;;
+              auth-failed) echo "Claude could not run at all: the token was refused." ;;
               passed) echo "Claude's resolution passed, but \`main\` moved while it worked, so it was not pushed. It is on the branch below; merging it is all that is left." ;;
               *) echo "The Claude step did not finish (${CLAUDE_RESULT:-no result}); see the run's log." ;;
             esac
