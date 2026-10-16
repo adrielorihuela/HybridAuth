@@ -101,6 +101,26 @@ and save the token it prints as a repository secret named **`CLAUDE_CODE_OAUTH_T
 repository's *Settings → Secrets and variables → Actions → New repository secret*. The next update
 that stops for review uses it. To turn Claude off, delete the secret.
 
+**The token lasts one year**, and a subscription token cannot be made to last longer. Two things
+catch it running out before an update depends on it:
+
+- `.github/workflows/claude-check.yml` asks Claude for a single word on the first of every month,
+  and on demand (Actions → *Claude token check* → *Run workflow*). If the token is missing,
+  expired or refused, it opens an issue labelled **`claude-token`** with the renewal steps; the
+  next green run closes it. Run it once after setting or renewing the secret.
+- If the token is refused during an update anyway, `claude-rounds.sh` stops at once with
+  `auth-failed` instead of spending its rounds, and the `upstream-update` issue says to renew it.
+
+To renew: run `claude setup-token` again and *Update* the same secret. The alternative that does
+not expire is a Claude Console API key, saved as `ANTHROPIC_API_KEY` instead — valid until revoked,
+but billed per use rather than covered by the plan; the workflows would need that secret passed to
+Claude in place of the OAuth token.
+
+**The schedules are kept alive.** In a public repository GitHub disables a scheduled workflow after
+60 days without commits, without saying so — and both upstreams can be that quiet. Once a day the
+`check` job re-enables `upstream.yml`, `claude-check.yml` and `branch-cleanup.yml` through the API,
+which restarts that count.
+
 ### Without Claude, or when it does not get there
 
 **Nothing reaches `main`**:
