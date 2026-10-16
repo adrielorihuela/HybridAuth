@@ -166,3 +166,7 @@ Because the failure is loud and total, check the console after enabling this for
   their row from `offline_player_auth`.
 - There is no rate limiting on `/register` beyond the three-strike login lockout, and no IP-based
   account limit.
+- **The authentication server can lag behind the newest Minecraft version.** It is NanoLimbo, which
+  learns new protocol versions on its own schedule; today it speaks up to 26.2 while the proxy
+  accepts 26.3. An offline player on a version it does not speak yet reaches it only through
+  ViaVersion, so keep ViaVersion installed. Premium players never visit it and are unaffected.

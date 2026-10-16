@@ -60,7 +60,7 @@ list, so they do not show up in tab completion.
 
 ## Reloading
 
-`/velocity reload` re-reads `comandos`. Commands that were removed from the list are
+`/hybridauth reload` re-reads `comandos`. Commands that were removed from the list are
 unregistered and newly added ones are registered, without restarting the proxy.
 
 ## Console
