@@ -43,7 +43,7 @@ import ua.nanit.limbo.server.data.InfoForwarding;
  * and a forwarding mode that disagrees with the proxy's breaks the handshake, so those two are
  * passed to {@link LimboServer} in code and never appear on disk at all.</p>
  *
- * <p>See {@code docs/auth-server.md}.</p>
+ * <p>See {@code docs/development/auth-server.md}.</p>
  */
 public final class AuthServer {
 

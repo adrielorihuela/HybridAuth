@@ -1305,7 +1305,7 @@ public class VelocityConfiguration implements ProxyConfig {
 
   /**
    * Settings for the offline authentication gate and the server that holds players while they
-   * authenticate. See {@code docs/offline-auth.md}.
+   * authenticate. See {@code docs/guide/offline-auth.md}.
    *
    * @param enabled whether unauthenticated offline players are held for a register/login gate
    * @param serverName the name the authentication server is registered under

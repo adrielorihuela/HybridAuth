@@ -49,7 +49,7 @@ public final class LimboServer {
     // HybridAuth patch: when embedded inside the proxy there is no standalone process to own,
     // so the interactive command manager (which reads System.in and would fight the proxy console),
     // the JVM shutdown hook and the explicit System.gc() are all skipped. Lifecycle is driven by
-    // VelocityServer instead. See docs/limbo.md.
+    // VelocityServer instead. See docs/development/auth-server.md.
     private boolean embedded;
     private java.net.SocketAddress pendingAddress;
     private ua.nanit.limbo.server.data.InfoForwarding pendingForwarding;

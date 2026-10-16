@@ -48,7 +48,7 @@ public final class LimboConfig {
     // HybridAuth patch: the bind address and the player-info forwarding are supplied in code by
     // the proxy and never read from settings.yml, so an operator cannot move this off loopback or
     // set a forwarding mode that disagrees with the proxy's. They must be installed before load(),
-    // because an absent `infoForwarding` node makes the serializer throw. See docs/auth-server.md.
+    // because an absent `infoForwarding` node makes the serializer throw. See docs/development/auth-server.md.
     @Getter(lombok.AccessLevel.NONE)
     private SocketAddress addressOverride;
     @Getter(lombok.AccessLevel.NONE)
