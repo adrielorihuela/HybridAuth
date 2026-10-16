@@ -72,17 +72,29 @@ git fetch --no-tags upstream
 git merge upstream/dev/4.0.0
 ```
 
-Done twice so far, and both times the conflict was the same *shape* in a different file:
+Done three times so far, and every time the conflict was the same *shape* in a different file:
 
 | Merge | Conflict | What it was |
 | --- | --- | --- |
 | `00759e52` → `4772ca30`, five commits | `gradle/libs.versions.toml`, two hunks | Upstream's version bumps against the fork's added dependencies |
 | → `db0a17ee`, four commits (Velocity 4.1.1) | `gradle.properties` | Upstream setting `version` against the fork's `forkName`/`forkVersion` block below it |
+| → `84bd8cc`, twenty-four commits (Velocity 4.2.0, Minecraft 26.3) | `gradle.properties`, `libs.versions.toml`, `default-velocity.toml`, the migration list, `RespawnPacket` | The same shape, plus upstream reaching `config-version` 2.9 for real — see below |
 
-Both resolve the same way: **keep both sides**. `version` is upstream's to set and the fork follows
+They all resolve the same way: **keep both sides**. `version` is upstream's to set and the fork follows
 it; `forkName` and `forkVersion` are ours and upstream knows nothing about them. Expect that shape
 again — the conflicts here are almost never about logic, they are two projects editing adjacent
 lines of the same file.
+
+**Upstream's CI does not apply here.** Since 4.2.0 upstream runs on Namespace runners
+(`namespace-profile-linux-default`, `nscloud-*` actions), which this repository has no access to.
+Keep `.github/workflows/gradle.yml` on `ubuntu-24.04` when it conflicts.
+
+**When upstream moves `config-version`, check `OfflineAuthMigration`.** It hands the key back to
+2.8 when it finds one of the numbers the fork used to write there (2.9, 3.0, 3.2). Upstream reached
+2.9 for real in 4.2.0, so the number alone stopped meaning anything, and the hand-back now also
+requires the old string `ping-passthrough` that upstream's 2.9 migration removes. Walking a genuine
+2.9 back made that migration run again on its own output. An upstream 3.0 would need the same
+thought; `ConfigVersionHandBackTest` is where to prove it.
 
 `dev/4.0.0` is upstream's default branch and the one this fork is based on. `dev/5.0.0` exists and
 is a different major line — do not merge it without deciding that deliberately.

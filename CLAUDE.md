@@ -127,7 +127,7 @@ release; `HybridAuth-<forkVersion>-thin.jar` is not runnable and only feeds `sha
 
 Two versions coexist, and they are not interchangeable:
 
-- `version` in `gradle.properties` (`4.1.1`) is the **upstream Velocity API version**.
+- `version` in `gradle.properties` (`4.2.1-SNAPSHOT`) is the **upstream Velocity API version**.
   It sets the Maven coordinates of `velocity-api`, so plugins compile against it — do not bump
   it to express a fork release.
 - `forkName` / `forkVersion` in `gradle.properties` name the **fork's distributable**. The
