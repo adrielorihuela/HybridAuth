@@ -18,12 +18,14 @@
 package com.velocitypowered.proxy.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.electronwill.nightconfig.core.CommentedConfig;
 import com.velocitypowered.proxy.config.VelocityConfiguration.PortalsConfig;
 import com.velocitypowered.proxy.config.VelocityConfiguration.PortalsConfig.Dimension;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -85,24 +87,67 @@ class PortalsConfigTest {
   }
 
   @Test
-  void portalToUnknownServerFailsValidation() throws IOException {
-    assertFalse(configurationWith("""
+  void multiLineEntriesAreRead() throws IOException {
+    // TOML 1.0 rejects an inline table spanning lines; the configuration is read as 1.1 for this.
+    final PortalsConfig portals = configurationWith("""
+        [portales]
+        lobby = {
+            nether = "survival",
+            end = "survival"
+        }
+        """).getPortalsConfig();
+    assertEquals(Optional.of("survival"), portals.target("lobby", Dimension.NETHER));
+    assertEquals(Optional.of("survival"), portals.target("lobby", Dimension.END));
+  }
+
+  @Test
+  void singleDimensionRedirectsOnlyThatOne() throws IOException {
+    final VelocityConfiguration configuration = configurationWith("""
+        [portales]
+        lobby = {
+            end = "Survival"
+        }
+        """);
+    assertTrue(configuration.validate());
+    final PortalsConfig portals = configuration.getPortalsConfig();
+    assertEquals(Optional.of("Survival"), portals.target("lobby", Dimension.END));
+    assertEquals(Optional.empty(), portals.target("lobby", Dimension.NETHER));
+  }
+
+  @Test
+  void shippedConfigurationRedirectsLobbyPortalsToSurvival() throws IOException {
+    try (InputStream in = VelocityConfiguration.class.getResourceAsStream(
+        "/default-velocity.toml")) {
+      final CommentedConfig config = Toml11Format.INSTANCE.createParser()
+          .parse(new InputStreamReader(in, StandardCharsets.UTF_8));
+      final PortalsConfig portals = PortalsConfig.fromConfig(config.get("portales"));
+      assertEquals(Optional.of("survival"), portals.target("lobby", Dimension.NETHER));
+      assertEquals(Optional.of("survival"), portals.target("lobby", Dimension.END));
+    }
+  }
+
+  // Unknown servers only warn: [portales] ships switched on and names `survival`, which the shipped
+  // [servers] does not have, so failing validation would stop every fresh installation.
+
+  @Test
+  void portalToUnknownServerOnlyWarns() throws IOException {
+    assertTrue(configurationWith("""
         [portales]
         lobby = { end = "skyblock" }
         """).validate());
   }
 
   @Test
-  void portalFromUnknownServerFailsValidation() throws IOException {
-    assertFalse(configurationWith("""
+  void portalFromUnknownServerOnlyWarns() throws IOException {
+    assertTrue(configurationWith("""
         [portales]
         skyblock = { end = "survival" }
         """).validate());
   }
 
   @Test
-  void portalToItselfFailsValidation() throws IOException {
-    assertFalse(configurationWith("""
+  void portalToItselfOnlyWarns() throws IOException {
+    assertTrue(configurationWith("""
         [portales]
         lobby = { nether = "Lobby" }
         """).validate());

@@ -204,14 +204,24 @@ comandos = [
 
 [portales]
 # Servers whose Nether and End portals send players to another server instead.
-# When a player on the server on the left is moved to the Nether or the End -- by a portal, or by
-# anything else that changes their dimension -- the proxy sends them to the server named for that
-# dimension. Either of the two can be left out, and both servers must exist in [servers] above.
+# When a player on the server named on the left is moved into the Nether or the End -- by a portal,
+# or by anything else that changes their dimension -- the proxy sends them to the server named for
+# that dimension. Either line can be left out, and that portal then works as usual:
 #
-# The origin server still needs the Nether and the End enabled (allow-nether in
-# server.properties, allow-end in bukkit.yml), since it is the dimension change the proxy sees.
+#   lobby = {
+#       end = "survival"
+#   }
 #
-# lobby = { nether = "survival", end = "survival" }
+# The origin server only needs the dimensions you list enabled there: allow-nether=true in
+# server.properties for "nether", allow-end: true in bukkit.yml for "end". It is the dimension
+# change the proxy sees, so a disabled dimension never gets that far.
+#
+# Server names are not case-sensitive. A name missing from [servers] above is reported when the
+# proxy starts and that entry is ignored. Remove the entry below if you do not want this.
+lobby = {
+    nether = "survival",
+    end = "survival"
+}
 
 [forced-hosts]
 # Configure your forced hosts here.

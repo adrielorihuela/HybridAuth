@@ -221,20 +221,25 @@ public class VelocityConfiguration implements ProxyConfig {
       }
     }
 
+    // Warnings, not errors: [portales] ships switched on and names `survival`, which the shipped
+    // [servers] does not have, so refusing to start here would stop every fresh installation. An
+    // entry naming an unknown server simply never fires.
     for (Map.Entry<String, Map<PortalsConfig.Dimension, String>> origin
         : portalsConfig.redirects().entrySet()) {
       if (servers.getServers().keySet().stream().noneMatch(origin.getKey()::equalsIgnoreCase)) {
-        logger.error("[portales] '{}' has no matching server in [servers].", origin.getKey());
-        valid = false;
+        logger.warn("[portales] '{}' has no matching server in [servers]; its portals work as "
+            + "usual.", origin.getKey());
+        continue;
       }
-      for (String target : origin.getValue().values()) {
-        if (servers.getServers().keySet().stream().noneMatch(target::equalsIgnoreCase)) {
-          logger.error("[portales] '{}' sends players to '{}', which has no matching server in "
-              + "[servers].", origin.getKey(), target);
-          valid = false;
-        } else if (target.equalsIgnoreCase(origin.getKey())) {
-          logger.error("[portales] '{}' sends players to itself.", origin.getKey());
-          valid = false;
+      for (Map.Entry<PortalsConfig.Dimension, String> target : origin.getValue().entrySet()) {
+        final String dimension = target.getKey().name().toLowerCase(Locale.ROOT);
+        if (servers.getServers().keySet().stream().noneMatch(target.getValue()::equalsIgnoreCase)) {
+          logger.warn("[portales] '{}' sends its {} to '{}', which has no matching server in "
+              + "[servers]; that portal works as usual.", origin.getKey(), dimension,
+              target.getValue());
+        } else if (target.getValue().equalsIgnoreCase(origin.getKey())) {
+          logger.warn("[portales] '{}' sends its {} to itself; that portal works as usual.",
+              origin.getKey(), dimension);
         }
       }
     }
@@ -628,7 +633,8 @@ public class VelocityConfiguration implements ProxyConfig {
       Files.createFile(githubTokenPath);
     }
 
-    try (final CommentedFileConfig config = CommentedFileConfig.builder(path)
+    // TOML 1.1, for the multi-line inline tables [portales] is written with. See Toml11Format.
+    try (final CommentedFileConfig config = CommentedFileConfig.builder(path, Toml11Format.INSTANCE)
             .defaultData(defaultConfigLocation)
             .autosave()
             .preserveInsertionOrder()

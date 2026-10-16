@@ -421,31 +421,6 @@ public class BackendPlaySessionHandler implements MinecraftSessionHandler {
     return false;
   }
 
-  /**
-   * Sends the player on if {@code [portales]} names a server for the dimension this server just
-   * moved them into. A backend has no way to tell the proxy that a player stepped into a portal,
-   * but it does have to tell the client that its dimension changed, and that is what this keys
-   * on. The respawn is still forwarded: if the target cannot be reached, the player is left
-   * consistently in this server's Nether or End rather than out of step with it.
-   */
-  private void redirectThroughPortal(final @Nullable Dimension dimension) {
-    if (dimension == null || portalRedirected) {
-      return;
-    }
-    final ConnectedPlayer player = serverConn.getPlayer();
-    final String origin = serverConn.getServerInfo().getName();
-    server.getConfiguration().getPortalsConfig()
-        .target(origin, dimension)
-        .flatMap(server::getServer)
-        .filter(target -> player.getConnectionInFlight() == null)
-        .ifPresent(target -> {
-          portalRedirected = true;
-          logger.info("{} entered the {} on {}, sending them to {}", player,
-              dimension.name().toLowerCase(Locale.ROOT), origin, target.getServerInfo().getName());
-          player.createConnectionRequest(target).fireAndForget();
-        });
-  }
-
   @Override
   public boolean handle(TransferPacket packet) {
     final InetSocketAddress originalAddress = packet.address();
@@ -578,6 +553,32 @@ public class BackendPlaySessionHandler implements MinecraftSessionHandler {
     }
 
     playerConnection.setAutoReading(writable);
+  }
+
+  /**
+   * Sends the player on if {@code [portales]} names a server for the dimension this server just
+   * moved them into. A backend has no way to tell the proxy that a player stepped into a portal,
+   * but it does have to tell the client that its dimension changed, and that is what this keys
+   * on. The respawn is still forwarded: if the target cannot be reached, the player is left
+   * consistently in this server's Nether or End rather than out of step with it.
+   */
+  private void redirectThroughPortal(final @Nullable Dimension dimension) {
+    if (dimension == null || portalRedirected) {
+      return;
+    }
+    final ConnectedPlayer player = serverConn.getPlayer();
+    final String origin = serverConn.getServerInfo().getName();
+    server.getConfiguration().getPortalsConfig()
+        .target(origin, dimension)
+        .flatMap(server::getServer)
+        .filter(target -> !target.getServerInfo().equals(serverConn.getServerInfo()))
+        .filter(target -> player.getConnectionInFlight() == null)
+        .ifPresent(target -> {
+          portalRedirected = true;
+          logger.info("{} entered the {} on {}, sending them to {}", player,
+              dimension.name().toLowerCase(Locale.ROOT), origin, target.getServerInfo().getName());
+          player.createConnectionRequest(target).fireAndForget();
+        });
   }
 
   /**

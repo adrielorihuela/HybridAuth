@@ -92,7 +92,7 @@ class PortalDimensionTest {
     return buf;
   }
 
-  private static RespawnPacket modern(final String levelName, final ProtocolVersion version) {
+  private static RespawnPacket modernAt(final String levelName, final ProtocolVersion version) {
     return respawn(0, new DimensionInfo("", levelName, false, false, version));
   }
 
@@ -113,7 +113,7 @@ class PortalDimensionTest {
   void endRespawnIsReadFromTheRawPacket() {
     for (final ProtocolVersion version : new ProtocolVersion[] {
         ProtocolVersion.MINECRAFT_1_21_4, ProtocolVersion.MAXIMUM_VERSION}) {
-      final ByteBuf buf = onTheWire(modern("minecraft:the_end", version), version);
+      final ByteBuf buf = onTheWire(modernAt("minecraft:the_end", version), version);
       assertEquals(Dimension.END, BackendPlaySessionHandler.portalDimension(buf, version),
           version.toString());
     }
@@ -122,7 +122,7 @@ class PortalDimensionTest {
   @Test
   void readingTheRawPacketLeavesItUntouched() {
     final ProtocolVersion version = ProtocolVersion.MAXIMUM_VERSION;
-    final ByteBuf buf = onTheWire(modern("minecraft:the_nether", version), version);
+    final ByteBuf buf = onTheWire(modernAt("minecraft:the_nether", version), version);
     final int readable = buf.readableBytes();
     assertEquals(Dimension.NETHER, BackendPlaySessionHandler.portalDimension(buf, version));
     assertEquals(0, buf.readerIndex());
@@ -144,7 +144,7 @@ class PortalDimensionTest {
   void overworldAndOtherPacketsAreIgnored() {
     final ProtocolVersion version = ProtocolVersion.MAXIMUM_VERSION;
     assertNull(BackendPlaySessionHandler.portalDimension(
-        onTheWire(modern("minecraft:overworld", version), version), version));
+        onTheWire(modernAt("minecraft:overworld", version), version), version));
     final ByteBuf other = Unpooled.buffer();
     ProtocolUtils.writeVarInt(other, play(version).getPacketId(new RespawnPacket()) + 1);
     other.writeBytes(new byte[] {1, 2, 3});
