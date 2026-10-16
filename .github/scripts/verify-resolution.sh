@@ -16,6 +16,8 @@
 #   - no merge, rebase or cherry-pick in progress, and nothing left uncommitted
 #   - no conflict markers in any tracked file
 #   - the base and every --contains commit are ancestors of HEAD
+#   - .github/ is exactly as it was at the base: upstream's CI is never taken, and the scripts doing
+#     this checking are not something the resolution may change
 #   - the notes exist, name the version in gradle.properties, and have no MANUAL left
 #   - the verdict marks every reason resolved and has a summary
 #   - ./gradlew build passes, run with --continue so every failing task is reported at once
@@ -74,6 +76,12 @@ if [ -n "${markers}" ]; then
 fi
 if ! git merge-base --is-ancestor "${base}" HEAD; then
   fail "main before the update (${base}) is no longer an ancestor of HEAD: history was rewritten. Upstream is merged, never rebased, squashed or amended (docs/development/updating-upstreams.md)."
+fi
+# Upstream's CI never applies here (updating-upstreams.md), and these are the scripts that judge the
+# result, so .github/ ends exactly as main had it.
+github="$(git diff --name-only "${base}" HEAD -- .github | head -n 10)"
+if [ -n "${github}" ]; then
+  fail "Files under .github/ differ from main before the update: $(echo "${github}" | tr '\n' ';' | sed 's/;$//'). Keep the fork's: git checkout ${base} -- <file> (or git rm a file upstream added), and commit."
 fi
 for sha in "${contains[@]}"; do
   if ! git merge-base --is-ancestor "${sha}" HEAD; then
@@ -140,7 +148,7 @@ echo "verify-resolution: ${build_cmd}"
 if ${build_cmd} > "${out}/build.log" 2>&1; then
   smoke_cmd="${VERIFY_SMOKE:-${here}/smoke-test.sh proxy/build/libs/HybridAuth-${version}.jar}"
   echo "verify-resolution: ${smoke_cmd}"
-  if ! ${smoke_cmd} > "${out}/smoke.log" 2>&1; then
+  if ! REPO_ROOT="$(pwd)" ${smoke_cmd} > "${out}/smoke.log" 2>&1; then
     echo smoke >> "${out}/failed"
   fi
 else

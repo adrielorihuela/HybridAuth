@@ -10,18 +10,20 @@
 drafts the notes with MANUAL sections for whoever resolves the update to fill in.
 
 The rendered notes go to standard output. Test counts are read from the build's JUnit reports, so
-render after `./gradlew build`.
+render after `./gradlew build`. The repository is the one this script is in, unless REPO_ROOT
+names another: upstream.yml runs a copy taken before Claude could edit anything.
 """
 
 import argparse
 import glob
+import os
 import re
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(os.environ.get("REPO_ROOT") or Path(__file__).resolve().parents[2])
 VELOCITY_REPO = "PaperMC/Velocity"
 
 # Conventional-commit types, and the heading each one is listed under.

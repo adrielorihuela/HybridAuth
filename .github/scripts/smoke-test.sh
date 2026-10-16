@@ -4,6 +4,8 @@
 # all pass with a proxy that does not start, which is why updating-upstreams.md asks for this.
 #
 # Usage: smoke-test.sh <path to HybridAuth-<version>.jar> [timeout seconds, default 120]
+# The configuration comes from the repository this script is in, unless REPO_ROOT names another:
+# upstream.yml runs a copy taken before Claude could edit anything.
 #
 # The configuration is the shipped one with the [plugins] lists emptied, so the run downloads
 # nothing and does not depend on Hangar, Modrinth or GitHub being up.
@@ -11,7 +13,7 @@ set -euo pipefail
 
 jar="$(realpath "${1:?path to the proxy jar}")"
 timeout="${2:-120}"
-here="$(cd "$(dirname "$0")/../.." && pwd)"
+here="${REPO_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 work="$(mktemp -d)"
 trap 'kill "${pid:-0}" 2>/dev/null || true; rm -rf "${work}"' EXIT
 
