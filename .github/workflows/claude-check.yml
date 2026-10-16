@@ -50,10 +50,14 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         OK: ${{ steps.ask.outputs.ok }}
       run: |
-        open="$(gh issue list --repo "${GITHUB_REPOSITORY}" --label claude-token --state open \
-          --json number --jq '.[0].number // empty')"
+        issues="$(gh api "repos/${GITHUB_REPOSITORY}" --jq .has_issues 2>/dev/null || echo false)"
+        open=""
+        if [ "${issues}" = "true" ]; then
+          open="$(gh issue list --repo "${GITHUB_REPOSITORY}" --label claude-token --state open \
+            --json number --jq '.[0].number // empty')"
+        fi
         if [ "${OK}" = "true" ]; then
-          echo "The Claude token works."
+          echo "The Claude token works." | tee -a "$GITHUB_STEP_SUMMARY"
           if [ -n "${open}" ]; then
             gh issue close "${open}" --repo "${GITHUB_REPOSITORY}" \
               --comment "The token works again (run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})."
@@ -75,6 +79,11 @@ jobs:
           echo
           echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
         } > "${RUNNER_TEMP}/issue.md"
+        cat "${RUNNER_TEMP}/issue.md" >> "$GITHUB_STEP_SUMMARY"
+        if [ "${issues}" != "true" ]; then
+          echo "::error::The Claude token does not work; see this run's summary. (Issues are disabled in this repository, so no issue was opened.)"
+          exit 1
+        fi
         gh label create claude-token --repo "${GITHUB_REPOSITORY}" --color d93f0b \
           --description "The Claude token for CI needs renewing" --force
         if [ -n "${open}" ]; then
