@@ -1,6 +1,7 @@
 # Publishes a GitHub release, with the runnable proxy jar attached, whenever forkVersion names a
 # version that has no release yet. A version with a hyphen in it (1.3.0-beta.1) is published as a
-# pre-release.
+# pre-release, and a stable version only ever from main. Publishing X.Y.Z deletes the X.Y.Z-*
+# pre-releases it replaces. Notes come from docs/releases/<version>.md when that file exists.
 #
 # It runs on a pushed v* tag, and also on a branch push that changes gradle.properties (or this file),
 # in which case it creates the v<forkVersion> tag itself. The second path exists because not every place a
@@ -43,6 +44,12 @@ jobs:
         elif gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v${version}" > /dev/null 2>&1; then
           echo "v${version} already exists; nothing to release."
           echo "release=false" >> "$GITHUB_OUTPUT"
+        elif [[ "${version}" != *-* && "${GITHUB_REF}" != "refs/heads/main" ]]; then
+          # A release commit is pushed to its branch before it is merged. Stable releases come from
+          # main, so the version that ships is the one that was merged; pre-releases can come from
+          # anywhere, since testing them before merging is their point.
+          echo "${version} is a stable version on ${GITHUB_REF_NAME}; it is released from main."
+          echo "release=false" >> "$GITHUB_OUTPUT"
         else
           echo "release=true" >> "$GITHUB_OUTPUT"
         fi
@@ -58,6 +65,16 @@ jobs:
     - name: Build with Gradle
       if: steps.version.outputs.release == 'true'
       run: ./gradlew build
+    # Hand-written notes in docs/releases/<version>.md when there are any, GitHub's generated list
+    # of commits otherwise.
+    - name: Find release notes
+      id: notes
+      if: steps.version.outputs.release == 'true'
+      run: |
+        notes="docs/releases/${{ steps.version.outputs.version }}.md"
+        if [ -f "${notes}" ]; then
+          echo "path=${notes}" >> "$GITHUB_OUTPUT"
+        fi
     # Only the runnable jar: HybridAuth-<version>-thin.jar exists to feed shadowJar and does not start.
     - name: Publish release
       if: steps.version.outputs.release == 'true'
@@ -68,5 +85,20 @@ jobs:
         name: HybridAuth ${{ steps.version.outputs.version }}
         files: proxy/build/libs/HybridAuth-${{ steps.version.outputs.version }}.jar
         prerelease: ${{ contains(steps.version.outputs.version, '-') }}
-        generate_release_notes: true
+        body_path: ${{ steps.notes.outputs.path }}
+        generate_release_notes: ${{ steps.notes.outputs.path == '' }}
         fail_on_unmatched_files: true
+    # A stable X.Y.Z replaces the X.Y.Z-beta.N builds that led to it; leaving them up only offers
+    # people an older copy of the same version. Releases and their tags both go.
+    - name: Remove the pre-releases this release replaces
+      if: steps.version.outputs.release == 'true' && !contains(steps.version.outputs.version, '-')
+      env:
+        GH_TOKEN: ${{ github.token }}
+        VERSION: ${{ steps.version.outputs.version }}
+      run: |
+        gh release list --repo "${GITHUB_REPOSITORY}" --limit 100 --json tagName,isPrerelease \
+          --jq ".[] | select(.isPrerelease and (.tagName | startswith(\"v${VERSION}-\"))) | .tagName" \
+          | while read -r tag; do
+              echo "Deleting ${tag}"
+              gh release delete "${tag}" --repo "${GITHUB_REPOSITORY}" --cleanup-tag --yes
+            done
