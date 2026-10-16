@@ -3,17 +3,25 @@
 # gradle/upstreams.gradle.kts (merge, never rebase; --no-tags; the subtree with its exact flags),
 # and resolves the one conflict that is mechanical (resolve-known-conflicts.py).
 #
-# Usage: upstream-merge.sh <output dir>
+# Usage: upstream-merge.sh [--keep-conflict] <output dir>
 # Prints key=value lines for $GITHUB_OUTPUT:
 #   status=uptodate|merged|conflict
 #   base=<main before the update>
+#   merge_head=<sha>  with --keep-conflict and status=conflict: what the merge in progress merges
 # and writes into <output dir>:
 #   conflicts.txt  files left in conflict (status=conflict), one per line
 #   resolved.txt   files whose conflict was resolved mechanically
-# A conflict that is not mechanical is aborted, leaving main as it was: a merge with conflict
-# markers in it is not something to push anywhere.
+# By default a conflict that is not mechanical is aborted, leaving main as it was: a merge with
+# conflict markers in it is not something to push anywhere. --keep-conflict leaves it in progress
+# instead, for Claude to resolve in the same run (upstream.yml does that only when Claude is set
+# up); nothing here pushes either way.
 set -euo pipefail
 
+keep=false
+if [ "${1:-}" = "--keep-conflict" ]; then
+  keep=true
+  shift
+fi
 out="${1:?output dir}"
 mkdir -p "${out}"
 : > "${out}/conflicts.txt"
@@ -48,6 +56,11 @@ step() {
     return 0
   fi
   cat "${out}/step-conflicts.txt" >> "${out}/conflicts.txt"
+  if [ "${keep}" = true ]; then
+    echo "merge_head=$(git rev-parse MERGE_HEAD)"
+    echo "status=conflict"
+    exit 0
+  fi
   git merge --abort
   git reset --quiet --hard "${base}"
   echo "status=conflict"

@@ -11,9 +11,23 @@ rediscover it.
 
 ## It runs by itself
 
-`.github/workflows/upstream.yml` does all of this every Monday, and on demand from Actions →
-*Upstream update* → *Run workflow*. It does what can be done with certainty and stops, without
-touching `main`, at the first thing that needs judgment.
+`.github/workflows/upstream.yml` does all of this **every hour**, and on demand from Actions →
+*Upstream update* → *Run workflow*. It does what can be done with certainty, has Claude supply the
+judgment when that is set up, and stops, without touching `main`, at anything neither can settle.
+
+**Why hourly.** Velocity can go a month without a commit and then get several in a day. GitHub has
+no event that tells this repository when somebody else's repository changes, so the workflow asks.
+Its first job, `check`, needs no JDK or Gradle: `upstream-check.sh` runs `git ls-remote` against
+both upstreams and compares — Velocity's tip is new if it is not in `main`'s history, NanoLimbo's
+if it differs from the `git-subtree-split:` trailer of the last `Squashed 'limbo/upstream/'`
+commit. When neither is new, the run is over in seconds. Only otherwise does the `update` job start.
+
+**It never does the same commits twice.** An update that stops for review leaves its issue's
+description and its release commit carrying a marker, `<!-- upstream velocity=<sha> limbo=<sha> -->`,
+naming exactly what it was made from. While an open `upstream-update` issue carries the marker of
+the current tips, the hourly check does nothing at all: no comment, no Claude, no build. When
+upstream gets new commits the marker no longer matches, so the update is redone over the new
+state and the issue's description rewritten. *Run workflow* with **force** redoes it regardless.
 
 | Step | Automatic | Stops for review when |
 | --- | --- | --- |
@@ -27,21 +41,85 @@ touching `main`, at the first thing that needs judgment.
 When every row passes, the merge goes to `main` with `chore: release <version> (automatic upstream
 update)`, and `release.yml` publishes it. Nobody is involved, and the notes say so.
 
-When any row stops it, **nothing reaches `main`**:
+When any row stops it, what happens next depends on whether Claude is set up.
 
-- If the merge finished, it is pushed to an `upstream-update/<date>` branch with `forkVersion`
+### Claude's part
+
+With the repository secret `CLAUDE_CODE_OAUTH_TOKEN` set, the same run hands the update to Claude.
+It runs **on the GitHub Actions runner** — the ephemeral machine doing the update, not anybody's
+computer — as the Claude Code CLI in headless mode, on the Claude subscription the token belongs
+to. Its instructions are [`.github/claude/resolve-upstream.md`](../../.github/claude/resolve-upstream.md),
+which sends it to this page and to `CLAUDE.md` and is followed by the reasons this update stopped.
+
+**What it may do.** Read and edit files, and run `git add`, `commit`, `status`, `diff`, `log`,
+`show`, `rm` and `checkout`. Nothing else: no Gradle, no `git push`, no GitHub access (there is no
+token in its environment, and the checkout keeps none on disk while it works). It must keep both
+sides of every conflict, never rebase, squash or amend, leave `.github/` as `main` had it, replace
+every `MANUAL` comment in the notes with what it found and did — saying the update was resolved by
+Claude in CI — and finish by writing a verdict marking each reason `resolved` or `needs-human`.
+
+**Claude does not build; GitHub does.** Building on the runner costs nothing, while having Claude
+wait for Gradle and read its output costs tokens. So the work goes in rounds
+(`.github/scripts/claude-rounds.sh`):
+
+1. **Round 1.** Claude gets the reasons — the review checks that fired, a red build or smoke test
+   with the failure already cut down, or a conflict — edits, commits, writes the verdict and stops.
+2. **GitHub verifies** (`verify-resolution.sh`): `./gradlew build`, the smoke test, no `MANUAL`
+   left, no conflict markers, nothing uncommitted, `.github/` unchanged, the upstream merge and the
+   old `main` still in history (so nothing was rebased), and every reason `resolved` in the verdict.
+3. **If that fails**, `extract-failure.py` reduces the logs to the part that says why — compiler
+   errors with file and line, failing tests with their message and first stack lines, Checkstyle
+   and Spotless violations, or what the smoke test missed — at most 150 lines, and that alone goes
+   to Claude in the **next round**: "the build failed with this; fix only that".
+4. **Up to three rounds.** A `needs-human` verdict ends them early, since more rounds would not
+   change it.
+
+If the update conflicted, the merge is left in progress for Claude (instead of aborted, as it is
+without Claude), and before round 1 Claude only concludes it, as a real merge commit with both
+parents. Then the review checks run on the merged tree and the notes are drafted, as for an update
+that merged, and the rounds begin with those reasons.
+
+The scripts that judge Claude's work, and its prompt, are copied before it starts and run from that
+copy, so nothing it edits in the checkout changes how it is judged.
+
+**When it merges by itself, and when it waits.** If a round passes, the update is **merged into
+`main` and released without anyone**: pushed to `main`, `release.yml` dispatched with
+`forkVersion` already bumped and Claude's notes, and the open `upstream-update` issue gets Claude's
+summary and is closed. If three rounds do not pass, Claude says a reason needs a person, it cannot
+conclude a conflicted merge, or `main` moved while it worked, nothing reaches `main`: its attempt
+is pushed to the `upstream-update/<date>` branch (unless the merge is still unconcluded) and the
+issue lists each round's errors and Claude's verdict, for a person to finish as below.
+
+**How to enable it.** On a computer with the Claude Code CLI, logged in to a Claude Pro or Max
+plan, run:
+
+```bash
+claude setup-token
+```
+
+and save the token it prints as a repository secret named **`CLAUDE_CODE_OAUTH_TOKEN`**, in the
+repository's *Settings → Secrets and variables → Actions → New repository secret*. The next update
+that stops for review uses it. To turn Claude off, delete the secret.
+
+### Without Claude, or when it does not get there
+
+**Nothing reaches `main`**:
+
+- If the merge was concluded, it is pushed to an `upstream-update/<date>` branch with `forkVersion`
   already bumped and `docs/releases/<version>.md` drafted in manual mode: the commits and the
-  reasons are filled in, and `MANUAL` comments mark what is left to write.
+  reasons are filled in, and `MANUAL` comments mark what is left to write. After Claude, the
+  branch holds its attempt instead.
 - If it conflicted, nothing is kept: a merge with conflict markers is not pushed anywhere.
-- An issue labelled **`upstream-update`** lists the reasons, the run, the branch and the steps
-  below. A later run that goes through closes it as superseded.
+- An issue labelled **`upstream-update`** lists the reasons, what Claude tried, the run, the branch
+  and the steps below. A later run that goes through closes it as superseded.
 
 Each check exists because that change has broken this fork, or would have, while the build stayed
 green. The sections further down say why for each.
 
 ### When it stops for review
 
-This is the part for a person, or for Claude. Asked to "resolve the upstream update", Claude:
+This is the part for a person, or for Claude in a session (Claude in CI follows the same steps,
+except that the workflow builds and merges for it). Asked to "resolve the upstream update", Claude:
 
 1. **Reads the issue.** Every reason it lists has to be dealt with; none is a formality.
 2. **Gets the merge.** From the `upstream-update/<date>` branch if there is one. If the update

@@ -1,22 +1,40 @@
 # Keeps the fork up to date with upstream Velocity and NanoLimbo, by itself where that is safe.
 # How it works and what to do when it stops: docs/development/updating-upstreams.md.
 #
-# Every Monday (or on demand) it merges both upstreams into main the documented way and decides:
+# Every hour (or on demand) the check job asks both upstreams, in seconds and without building,
+# whether they have commits main does not. Only then does the update job merge them into main the
+# documented way and decide:
 #
-#   - Nothing new upstream: nothing happens.
+#   - Nothing new upstream, or nothing new since the update already waiting in an open
+#     upstream-update issue (its marker names the exact commits): nothing happens.
 #   - Merged, the build and the smoke test pass, and no review check fires: the update is pushed to
 #     main and released as the next patch version, with notes from
 #     docs/releases/TEMPLATE-upstream.md saying that, and why nobody needed to look at it.
 #   - Anything else (a conflict that is not mechanical, a red build, a proxy that does not start, or
-#     a change of the kind that has broken this fork before): nothing reaches main. The merge, if it
-#     finished, waits on an upstream-update/<date> branch with drafted notes, and an issue labelled
-#     upstream-update says what needs judgment and how to finish it. The run fails, so it shows.
+#     a change of the kind that has broken this fork before) needs judgment:
+#       - With the CLAUDE_CODE_OAUTH_TOKEN secret set, Claude resolves it here, on the runner, in up
+#         to three rounds (.github/scripts/claude-rounds.sh, prompt in
+#         .github/claude/resolve-upstream.md). Claude edits and commits but never builds or pushes;
+#         between rounds this workflow builds, starts the jar and checks the result
+#         (verify-resolution.sh). If a round passes, the update is pushed to main and released with
+#         Claude's notes, and the issue gets Claude's summary and is closed.
+#       - Without the secret, or when Claude does not get there: nothing reaches main. The merge,
+#         if it was concluded, waits on an upstream-update/<date> branch with its notes, and an
+#         issue labelled upstream-update says what needs judgment, what Claude tried, and how to
+#         finish it. The run fails, so it shows.
 
 name: Upstream update
 on:
+  # Hourly, off minute 0, which GitHub delays. Nothing can tell this repository when PaperMC or
+  # Nan1t push, so it asks; the check costs a few seconds when there is nothing new.
   schedule:
-    - cron: '17 6 * * 1'
+    - cron: '23 * * * *'
   workflow_dispatch:
+    inputs:
+      force:
+        description: Redo the update even if an open upstream-update issue already covers these upstream commits
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -28,11 +46,60 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  update:
+  check:
     runs-on: ubuntu-24.04
+    outputs:
+      run: ${{ steps.handled.outputs.run }}
+      limbo: ${{ steps.new.outputs.limbo }}
+    # With pipefail, so a failed ls-remote fails the run instead of reading as "nothing new".
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - name: Checkout main
+      uses: actions/checkout@v6
+      with:
+        ref: main
+        # Whole history, to ask whether upstream's tip is in it; no file contents, which it never reads.
+        fetch-depth: 0
+        filter: blob:none
+        persist-credentials: false
+    - name: Look for new upstream commits
+      id: new
+      run: .github/scripts/upstream-check.sh | tee -a "$GITHUB_OUTPUT"
+    # An update that stopped for review stays stopped until somebody resolves it or upstream moves:
+    # redoing it every hour would only repeat the same issue, and the same work.
+    - name: Skip what is already waiting for review
+      id: handled
+      if: steps.new.outputs.new == 'true'
+      env:
+        GH_TOKEN: ${{ github.token }}
+        MARKER: ${{ steps.new.outputs.marker }}
+        FORCE: ${{ inputs.force }}
+      run: |
+        # The marker is hexadecimal shas and fixed text, so it is safe inside the jq string. A failed
+        # lookup redoes the update rather than skipping it.
+        issue="$(gh issue list --repo "${GITHUB_REPOSITORY}" --label upstream-update --state open \
+          --json number,body --jq ".[] | select(.body | contains(\"${MARKER}\")) | .number" \
+          | head -n 1)" || issue=""
+        if [ "${FORCE}" != "true" ] && [ -n "${issue}" ]; then
+          echo "These upstream commits are already waiting for review in #${issue}. Nothing to do."
+          echo "run=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "run=true" >> "$GITHUB_OUTPUT"
+        fi
+
+  update:
+    needs: check
+    if: needs.check.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    # Three Claude rounds and four builds at most; anything longer is stuck.
+    timeout-minutes: 240
     env:
       WORK: ${{ github.workspace }}/../upstream-work
-      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        shell: bash
     steps:
     - name: Checkout main
       uses: actions/checkout@v6
@@ -40,6 +107,8 @@ jobs:
         ref: main
         # The subtree pull finds its previous import by searching the whole history.
         fetch-depth: 0
+        # No token on disk while Claude works in this checkout; "Allow pushing" adds it afterwards.
+        persist-credentials: false
     - name: Set up Gradle
       uses: gradle/actions/setup-gradle@v5
     - name: Set up JDK 25
@@ -52,10 +121,23 @@ jobs:
         git config user.name "github-actions[bot]"
         git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
         mkdir -p "${WORK}"
+    # Without the secret, everything below behaves as it did before Claude: a person resolves it.
+    - name: Is Claude set up
+      id: claude
+      env:
+        TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      run: |
+        if [ -n "${TOKEN}" ]; then echo "enabled=true"; else echo "enabled=false"; fi | tee -a "$GITHUB_OUTPUT"
 
+    # With Claude, a conflict is left in progress for it to resolve; without, it is aborted.
     - name: Merge the upstreams
       id: merge
-      run: .github/scripts/upstream-merge.sh "${WORK}" | tee -a "$GITHUB_OUTPUT"
+      env:
+        CLAUDE_ENABLED: ${{ steps.claude.outputs.enabled }}
+      run: |
+        keep=()
+        if [ "${CLAUDE_ENABLED}" = "true" ]; then keep=(--keep-conflict); fi
+        .github/scripts/upstream-merge.sh "${keep[@]}" "${WORK}" | tee -a "$GITHUB_OUTPUT"
 
     - name: Review checks
       id: review
@@ -69,7 +151,7 @@ jobs:
       id: build
       if: steps.merge.outputs.status == 'merged'
       continue-on-error: true
-      run: ./gradlew build
+      run: ./gradlew --console=plain build 2>&1 | tee "${WORK}/build.log"
 
     - name: Smoke test
       id: smoke
@@ -77,10 +159,12 @@ jobs:
       continue-on-error: true
       run: |
         version="$(grep '^forkVersion=' gradle.properties | cut -d= -f2)"
-        .github/scripts/smoke-test.sh "proxy/build/libs/HybridAuth-${version}.jar"
+        .github/scripts/smoke-test.sh "proxy/build/libs/HybridAuth-${version}.jar" 2>&1 | tee "${WORK}/smoke.log"
 
     - name: Decide
       id: decide
+      env:
+        CHECK_LIMBO: ${{ needs.check.outputs.limbo }}
       run: |
         status="${{ steps.merge.outputs.status }}"
         reasons="${WORK}/reasons.txt"
@@ -93,10 +177,13 @@ jobs:
         if [ "${status}" = "conflict" ]; then
           echo "The merge conflicts in files that need a person: $(paste -sd, "${WORK}/conflicts.txt" | sed 's/,/, /g')" >> "${reasons}"
         fi
+        # What failed, cut down to what says why: Claude's first round starts from it.
         if [ "${status}" = "merged" ] && [ "${{ steps.build.outcome }}" != "success" ]; then
           echo "./gradlew build failed on the merged tree; the run's log has the failure" >> "${reasons}"
+          python3 -I .github/scripts/extract-failure.py --build "${WORK}/build.log" > "${WORK}/initial-failure.txt"
         elif [ "${status}" = "merged" ] && [ "${{ steps.smoke.outcome }}" != "success" ]; then
           echo "The proxy built but did not start cleanly in the smoke test; the run's log has its output" >> "${reasons}"
+          python3 -I .github/scripts/extract-failure.py --smoke "${WORK}/smoke.log" > "${WORK}/initial-failure.txt"
         fi
         if [ -s "${reasons}" ]; then
           echo "path=manual" >> "$GITHUB_OUTPUT"
@@ -107,22 +194,57 @@ jobs:
         IFS=. read -r major minor patch <<< "${previous#v}"
         echo "previous=${previous}" >> "$GITHUB_OUTPUT"
         echo "version=${major}.${minor}.$((patch + 1))" >> "$GITHUB_OUTPUT"
+        # What this update was made from, as fetched; the check job compares the next tips with it.
+        # NanoLimbo is not fetched when Velocity's merge stopped first, so its tip is the check's.
+        velocity="$(git rev-parse upstream/dev/4.0.0)"
+        limbo="$(git rev-parse -q --verify limbo-upstream/main || echo "${CHECK_LIMBO}")"
+        echo "marker=<!-- upstream velocity=${velocity} limbo=${limbo} -->" >> "$GITHUB_OUTPUT"
 
-    # Release as a patch: an upstream update that needed nobody changes nothing this fork adds.
-    - name: Release automatically
-      if: steps.decide.outputs.path == 'auto'
+    # The release commit on top of the merge: forkVersion and docs/releases/<version>.md. A conflicted
+    # merge has nothing to put it on; claude-rounds.sh drafts it once the merge is concluded.
+    - name: Draft the release
+      if: steps.decide.outputs.path == 'auto' || (steps.decide.outputs.path == 'manual' && steps.merge.outputs.status == 'merged')
       env:
         VERSION: ${{ steps.decide.outputs.version }}
         PREVIOUS: ${{ steps.decide.outputs.previous }}
+        BASE: ${{ steps.merge.outputs.base }}
+        MARKER: ${{ steps.decide.outputs.marker }}
+      run: .github/scripts/upstream-draft.sh "${{ steps.decide.outputs.path }}" "${WORK}"
+
+    # Claude works in this checkout with no GitHub token anywhere it can reach, never runs Gradle,
+    # and never pushes. The script builds and checks between rounds; the steps below publish.
+    - name: Resolve with Claude
+      id: resolve
+      if: steps.decide.outputs.path == 'manual' && steps.claude.outputs.enabled == 'true'
+      continue-on-error: true
+      timeout-minutes: 180
+      env:
+        CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        VERSION: ${{ steps.decide.outputs.version }}
+        PREVIOUS: ${{ steps.decide.outputs.previous }}
+        BASE: ${{ steps.merge.outputs.base }}
+        MARKER: ${{ steps.decide.outputs.marker }}
+        STATUS: ${{ steps.merge.outputs.status }}
+        MERGE_HEAD: ${{ steps.merge.outputs.merge_head }}
       run: |
-        sed -i "s/^forkVersion=.*/forkVersion=${VERSION}/" gradle.properties
-        python3 -I .github/scripts/render-notes.py upstream --mode auto --version "${VERSION}" \
-          --previous "${PREVIOUS}" --base "${{ steps.merge.outputs.base }}" \
-          --velocity-ref upstream/dev/4.0.0 --resolved "${WORK}/resolved.txt" \
-          > "docs/releases/${VERSION}.md"
-        git add gradle.properties "docs/releases/${VERSION}.md"
-        git commit -m "chore: release ${VERSION} (automatic upstream update)" \
-          -m "The weekly upstream update merged cleanly, built, started, and fired no review check, so it is released without anyone. See docs/releases/${VERSION}.md."
+        .github/scripts/claude-rounds.sh "${WORK}"
+        echo "result=$(cat "${WORK}/claude/result")" >> "$GITHUB_OUTPUT"
+
+    - name: Allow pushing
+      if: "!cancelled() && (steps.decide.outputs.path == 'auto' || steps.decide.outputs.path == 'manual')"
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        git config --local http.https://github.com/.extraheader \
+          "AUTHORIZATION: basic $(printf 'x-access-token:%s' "${GH_TOKEN}" | base64 -w0)"
+
+    # Released as a patch: an upstream update that needed nobody changes nothing this fork adds.
+    - name: Release automatically
+      if: steps.decide.outputs.path == 'auto'
+      env:
+        GH_TOKEN: ${{ github.token }}
+        VERSION: ${{ steps.decide.outputs.version }}
+      run: |
         git push origin HEAD:main
         # Pushes made with GITHUB_TOKEN start no workflow, so the release is started by hand.
         gh workflow run release.yml --ref main
@@ -131,43 +253,106 @@ jobs:
           gh issue close "${issue}" --comment "Superseded: a later upstream update merged and was released as v${VERSION} automatically."
         done
 
-    - name: Hand over for review
-      if: steps.decide.outputs.path == 'manual'
+    # Claude's resolution passed everything a reviewer would ask for, so it merges itself.
+    - name: Merge Claude's resolution
+      id: claude-merge
+      if: "!cancelled() && steps.decide.outputs.path == 'manual' && steps.resolve.outputs.result == 'passed'"
       env:
+        GH_TOKEN: ${{ github.token }}
         VERSION: ${{ steps.decide.outputs.version }}
-        PREVIOUS: ${{ steps.decide.outputs.previous }}
-        STATUS: ${{ steps.merge.outputs.status }}
+        MARKER: ${{ steps.decide.outputs.marker }}
+      run: |
+        run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+        # main moving meanwhile is not fatal: the update goes to review like any other.
+        if ! git push origin HEAD:main; then
+          echo "::warning::main moved during the update; handing Claude's resolution over for review instead."
+          echo "merged=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        echo "merged=true" >> "$GITHUB_OUTPUT"
+        gh workflow run release.yml --ref main
+        {
+          echo "Claude resolved this upstream update in CI, in $(cat "${WORK}/claude/rounds") round(s); the workflow built it, ran the tests and started the jar, and it was merged into \`main\` and is being released as v${VERSION} with the notes in [\`docs/releases/${VERSION}.md\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/main/docs/releases/${VERSION}.md)."
+          echo
+          echo "- Run: ${run_url}"
+          echo
+          echo "## What Claude did"
+          echo
+          cat "${WORK}/claude/report.md"
+          echo
+          echo "${MARKER}"
+        } > "${WORK}/summary.md"
+        gh label create upstream-update --color d93f0b \
+          --description "An upstream update waiting for review" --force
+        open="$(gh issue list --label upstream-update --state open --json number --jq '.[].number')"
+        if [ -z "${open}" ]; then
+          # Nothing was waiting, but the summary deserves a record outside the run's log.
+          url="$(gh issue create --title "Upstream update resolved by Claude (v${VERSION})" \
+            --label upstream-update --body-file "${WORK}/summary.md")"
+          gh issue close "${url}"
+        fi
+        for issue in ${open}; do
+          gh issue comment "${issue}" --body-file "${WORK}/summary.md"
+          gh issue close "${issue}"
+        done
+
+    - name: Hand over for review
+      if: "!cancelled() && steps.decide.outputs.path == 'manual' && steps.claude-merge.outputs.merged != 'true'"
+      env:
+        GH_TOKEN: ${{ github.token }}
+        VERSION: ${{ steps.decide.outputs.version }}
+        BASE: ${{ steps.merge.outputs.base }}
+        MARKER: ${{ steps.decide.outputs.marker }}
+        CLAUDE_ENABLED: ${{ steps.claude.outputs.enabled }}
+        CLAUDE_RESULT: ${{ steps.resolve.outputs.result }}
       run: |
         run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
         branch=""
-        if [ "${STATUS}" = "merged" ]; then
-          # The merge is kept, with its notes drafted, so whoever finishes it starts from here.
-          sed -i "s/^forkVersion=.*/forkVersion=${VERSION}/" gradle.properties
-          python3 -I .github/scripts/render-notes.py upstream --mode manual --version "${VERSION}" \
-            --previous "${PREVIOUS}" --base "${{ steps.merge.outputs.base }}" \
-            --velocity-ref upstream/dev/4.0.0 --reasons "${WORK}/reasons.txt" \
-            --resolved "${WORK}/resolved.txt" > "docs/releases/${VERSION}.md"
-          git add gradle.properties "docs/releases/${VERSION}.md"
-          git commit -m "chore: release ${VERSION} (upstream update, needs review)" \
-            -m "Drafted by the weekly upstream update, which stopped for review. Not on main until somebody finishes it."
+        unpushed=""
+        # A merge still in progress has conflict markers in it, and is not pushed anywhere. A push can
+        # also be refused: GITHUB_TOKEN may not write workflow files, which upstream's merge can touch.
+        if [ ! -e .git/MERGE_HEAD ] && [ "$(git rev-parse HEAD)" != "${BASE}" ]; then
           branch="upstream-update/$(date -u +%F)"
-          git push --force origin "HEAD:refs/heads/${branch}"
+          if ! git push --force origin "HEAD:refs/heads/${branch}"; then
+            echo "::warning::Could not push ${branch}."
+            unpushed="${branch}"
+            branch=""
+          fi
         fi
+        # After a conflict Claude concluded, claude-rounds.sh has rewritten these with the review
+        # checks of the merged tree.
+        reasons="${WORK}/reasons.txt"
 
         {
-          echo "The weekly upstream update stopped, because something in it needs judgment rather than a script."
+          echo "The upstream update stopped, because something in it needs judgment rather than a script."
           echo
           echo "## What needs review"
           echo
-          sed 's/^/- /' "${WORK}/reasons.txt"
+          sed 's/^/- /' "${reasons}"
+          if [ "${CLAUDE_ENABLED}" = "true" ]; then
+            echo
+            echo "## What Claude tried"
+            echo
+            case "${CLAUDE_RESULT}" in
+              needs-human) echo "Claude decided at least one reason needs a person, and said why:" ;;
+              failed) echo "Claude's resolution did not pass in $(cat "${WORK}/claude/rounds" 2>/dev/null || echo 3) round(s). Its commits are on the branch below, as a starting point." ;;
+              unresolved-conflict) echo "Claude could not conclude the conflicted merge." ;;
+              passed) echo "Claude's resolution passed, but \`main\` moved while it worked, so it was not pushed. It is on the branch below; merging it is all that is left." ;;
+              *) echo "The Claude step did not finish (${CLAUDE_RESULT:-no result}); see the run's log." ;;
+            esac
+            echo
+            cat "${WORK}/claude/report.md" 2>/dev/null || true
+          fi
           echo
           echo "## Where it is"
           echo
           echo "- Run: ${run_url}"
-          echo "- main before the update: \`${{ steps.merge.outputs.base }}\`"
+          echo "- main before the update: \`${BASE}\`"
           echo "- Velocity: \`$(git rev-parse --short upstream/dev/4.0.0)\` on \`dev/4.0.0\`"
           if [ -n "${branch}" ]; then
-            echo "- The merge, with \`forkVersion=${VERSION}\` and draft notes in \`docs/releases/${VERSION}.md\`: [\`${branch}\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/tree/${branch})"
+            echo "- The merge, with \`forkVersion=${VERSION}\` and the notes in \`docs/releases/${VERSION}.md\`: [\`${branch}\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/tree/${branch})"
+          elif [ -n "${unpushed}" ]; then
+            echo "- The merge was concluded but GitHub refused to push \`${unpushed}\` (the run's log says why; usually a change to \`.github/workflows/\`, which the workflow's token may not make). Re-run the merge locally (below)."
           else
             echo "- Nothing was kept: a merge with conflict markers in it is not pushed anywhere. Re-run the merge locally (below)."
           fi
@@ -185,13 +370,20 @@ jobs:
           echo "3. Finish \`docs/releases/${VERSION}.md\`: fill in the \`MANUAL\` sections with what was found and what was done."
           echo "4. \`./gradlew build\`, then start the jar and check the boot line and the authentication server."
           echo "5. Merge into \`main\` (a merge, never a squash or rebase). \`release.yml\` releases \`v${VERSION}\` with those notes, and closing this issue is the last step."
+          echo
+          echo "While this issue is open, the hourly update does not redo these upstream commits; it redoes the update, and rewrites this description, when upstream gets new ones."
+          echo
+          echo "${MARKER}"
         } > "${WORK}/issue.md"
 
         gh label create upstream-update --color d93f0b \
           --description "An upstream update waiting for review" --force
         existing="$(gh issue list --label upstream-update --state open --json number --jq '.[0].number // empty')"
         if [ -n "${existing}" ]; then
-          gh issue comment "${existing}" --body-file "${WORK}/issue.md"
+          # The description is what the check job reads, so it always describes the latest attempt.
+          gh issue edit "${existing}" --title "Upstream update needs review (v${VERSION})" \
+            --body-file "${WORK}/issue.md"
+          gh issue comment "${existing}" --body "Upstream has new commits, so the update was redone: ${run_url}. The description above is updated."
           echo "Updated issue #${existing}."
         else
           gh issue create --title "Upstream update needs review (v${VERSION})" \
