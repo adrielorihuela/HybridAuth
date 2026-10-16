@@ -137,7 +137,10 @@ Two versions coexist, and they are not interchangeable:
 - `forkName` / `forkVersion` in `gradle.properties` name the **fork's distributable**. The
   proxy's `shadowJar` uses them for the archive name and manifest, and `VelocityServer#getVersion`
   reads that manifest, which is why the proxy logs `Booting up HybridAuth <forkVersion>`.
-  Bump `forkVersion` for a fork release and tag it `v<forkVersion>`.
+  Bump `forkVersion` for a fork release; `.github/workflows/release.yml` tags `v<forkVersion>` and
+  publishes the release itself once the bump reaches `main`, with `docs/releases/<forkVersion>.md`
+  as its notes, and removes the `<forkVersion>-*` pre-releases it replaces. A hyphenated version is
+  a pre-release and can be published from any branch, for testing before a merge.
 
 ### Java 25 is a hard requirement
 

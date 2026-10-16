@@ -209,5 +209,13 @@ would rewrite NanoLimbo's GPL copyright notices to "Velocity Contributors".
 1. Bump `forkVersion` in `gradle.properties`. Leave `version` alone — it is the upstream Velocity
    API version that plugins compile against.
 2. `./gradlew build`, then run the shaded jar and check the boot line and the authentication server.
-3. Tag `v<forkVersion>` and push the tag.
-4. Create the release with `HybridAuth-<forkVersion>.jar`.
+3. Write the release notes in `docs/releases/<forkVersion>.md`, in the shape of the earlier ones:
+   what is new and why, what came from upstream, what the fork fixed, how to upgrade.
+4. Get the bump onto `main`. `.github/workflows/release.yml` sees `forkVersion` change, builds,
+   creates the `v<forkVersion>` tag and the release with `HybridAuth-<forkVersion>.jar` and those
+   notes, and deletes the `<forkVersion>-*` pre-releases it replaces. Pushing a `v<forkVersion>` tag
+   by hand still works.
+
+A version with a hyphen (`1.3.0-beta.1`) is published as a pre-release, from any branch, which is
+how a build is tried on a live server before it is merged. A stable version is only ever released
+from `main`.
