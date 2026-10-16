@@ -17,6 +17,7 @@
 
 package com.velocitypowered.proxy.command.builtin;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -87,9 +88,9 @@ class BuiltinCommandUtilTest {
   }
 
   @Test
-  void nodeSayingNoDenies() {
-    // Not an OR over the prefixes: an operator who wrote -velocity.command.server.lobby before any
-    // of this expects it to keep blocking, and a plain OR would quietly stop honouring it.
+  void anyNodeSayingNoDeniesWhenNothingNewerIsSet() {
+    // An operator who wrote velocity.command.server.lobby false before the rename expects it to
+    // keep blocking, as long as they have not set the current node since.
     for (final String prefix
         : new String[]{"hybridauth.command.", "hybridvelocity.command.", "velocity.command."}) {
       assertFalse(BuiltinCommandUtil.isNotDenied(
@@ -98,9 +99,27 @@ class BuiltinCommandUtilTest {
   }
 
   @Test
-  void grantOnOneNodeDoesNotOverrideDenyOnAnother() {
-    assertFalse(BuiltinCommandUtil.isNotDenied(sourceWith(Map.of(
+  void grantOnTheCurrentNodeWinsOverDenyOnAnOlderOne() {
+    // The LuckPerms report: hybridauth.command.server.lobby true did nothing while anything still
+    // resolved velocity.command.server.lobby to false.
+    assertTrue(BuiltinCommandUtil.isNotDenied(sourceWith(Map.of(
         "hybridauth.command." + SERVER, Tristate.TRUE,
         "velocity.command." + SERVER, Tristate.FALSE)), SERVER));
+  }
+
+  @Test
+  void bothHelpersAgreeOnWhichNodeDecides() {
+    for (final Tristate current : Tristate.values()) {
+      for (final Tristate legacy : Tristate.values()) {
+        final CommandSource source = sourceWith(Map.of(
+            "hybridauth.command." + NODE, current, "velocity.command." + NODE, legacy));
+        final Tristate deciding = current != Tristate.UNDEFINED ? current : legacy;
+        final String description = current + "/" + legacy;
+        assertEquals(deciding == Tristate.TRUE,
+            BuiltinCommandUtil.isAllowed(source, NODE), description);
+        assertEquals(deciding != Tristate.FALSE,
+            BuiltinCommandUtil.isNotDenied(source, NODE), description);
+      }
+    }
   }
 }

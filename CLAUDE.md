@@ -389,14 +389,20 @@ command is `/hybridauth`, with `ha`, `hv`, `hybridvelocity` and `velocity` as al
 
 Permissions are tri-state and are checked **only** through the two helpers in
 `command/builtin/BuiltinCommandUtil.java`, never by calling `getPermissionValue` directly. Nodes are
-`hybridauth.command.*`, and each helper also consults the pre-rename `velocity.command.*` node so
-that renaming did not revoke anything operators had already granted:
+`hybridauth.command.*`, and each helper also consults upstream's `velocity.command.*` node so that
+a permission set up for stock Velocity keeps working. Both helpers share one rule, in `resolve`:
+**the `hybridauth` node decides whenever it is set, true or false; otherwise the `velocity` node
+decides; otherwise the command's default applies.** Only the default differs:
 
-- `isAllowed` — privileged commands. Granted only if a node says so, and the legacy node is read
-  only when the current one is unset, so an explicit deny always wins.
-- `isNotDenied` — `/server` and the per-server shortcuts, which everyone has unless denied. **Either**
-  node saying no denies. A plain OR here would stop honouring a pre-rename
-  `-velocity.command.server.<name>`, which is why the two helpers exist rather than one.
+- `isAllowed` — privileged commands, denied by default.
+- `isNotDenied` — `/server` and the per-server shortcuts, allowed by default.
+
+`isNotDenied` used to deny when *either* node said no. With LuckPerms that made the current node
+useless on its own: anything resolving `velocity.command.server` to false — a default group, a
+wildcard, a leftover from stock Velocity — silently overrode a grant on
+`hybridauth.command.server`, and operators could only make it work by setting the `velocity` node.
+That was the 1.3.1 permission fix; `ServerPermissionTest` covers every combination for `/server`
+and a shortcut, and must keep doing so.
 
 **`velocity.command.*` also happens to be the prefix of the translation keys** in
 `messages*.properties`. They are not permissions. A blanket rename across that prefix would rewrite

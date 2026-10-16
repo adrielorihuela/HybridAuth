@@ -43,20 +43,50 @@ Rules:
 
 ## Permissions
 
-Each command checks the permission `hybridauth.command.server.<server name in lowercase>` —
-for example `hybridauth.command.server.lobby`.
+Each shortcut checks its own node, `hybridauth.command.server.<server name in lowercase>` — for
+example `hybridauth.command.server.lobby` for `/Lobby`. `/server` checks
+`hybridauth.command.server`. A shortcut does not depend on `/server`, and `/server <name>` does not
+check the shortcut's node, so denying `/Lobby` does not stop `/server Lobby`.
 
-The check follows the same permissive style as Velocity's own `/server` command: the
-command is allowed unless the permission is explicitly set to **false**. That means:
+These commands are allowed unless a permission says otherwise, like Velocity's own `/server`:
 
 * With no permissions plugin installed, every player can use every configured command.
-* A permissions plugin can hide and block a specific command by negating its node, for
-  example `-hybridauth.command.server.lobby` in LuckPerms.
-* Granting the node explicitly also works, and is a no-op unless something else denies it.
+* Setting the node to **false** hides and blocks the command; setting it to **true** allows it.
+* The node's value decides on its own. If it is set, true or false, nothing else is consulted.
+* If it is not set, upstream Velocity's `velocity.command.server.<server>` (and
+  `velocity.command.server` for `/server`) is read instead, so a permission set up for stock
+  Velocity keeps working. If neither is set, the command is allowed.
 
-Because each server has its own node, per-server access can be given to different ranks
-without touching `/server`. Denied commands are also removed from the player's command
-list, so they do not show up in tab completion.
+So `hybridauth.command.*` always overrides `velocity.command.*`, and having both set is never a
+conflict: a player whose default group denies `velocity.command.server` but who is granted
+`hybridauth.command.server` can use `/server`.
+
+With LuckPerms, set the value as `true` or `false` at the end of the command. Do not put a `-` in
+front of the node: LuckPerms does not read that as a negation, it creates a different node with a
+`-` in its name that nothing checks.
+
+```
+# Nobody in the default group gets /lobby...
+lp group default permission set hybridauth.command.server.lobby false
+# ...except VIPs.
+lp group vip permission set hybridauth.command.server.lobby true
+
+# Take /server away from the default group, and give it back to one player.
+lp group default permission set hybridauth.command.server false
+lp user Steve123 permission set hybridauth.command.server true
+
+# Undo: the command is allowed again unless velocity.command.server.lobby says otherwise.
+lp group default permission unset hybridauth.command.server.lobby
+```
+
+`hybridauth.command.server.*` matches every shortcut at once, provided LuckPerms' `apply-wildcards`
+is left on (its default). Set `hybridauth.command.server` separately for `/server` itself.
+
+Because each server has its own node, per-server access can be given to different ranks without
+touching `/server`. Denied commands are also removed from the player's command list, so they do not
+show up in tab completion. That list is sent when the backend server sends its own, which is when
+the player joins or changes server, so a permission changed while a player is online blocks the
+command straight away but may leave it in their tab completion until then.
 
 ## Reloading
 

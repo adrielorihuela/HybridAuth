@@ -47,7 +47,8 @@ public final class ServerShortcutCommand {
    *
    * <p>The command is available to every player unless a permissions plugin explicitly denies
    * {@code hybridauth.command.server.<server name>}, matching how {@code /server} behaves. The
-   * pre-rename {@code velocity.} node is still honoured, so an existing deny keeps working.</p>
+   * upstream {@code velocity.} node is read when that one is unset, so a permission set up for
+   * stock Velocity keeps working.</p>
    *
    * @param proxy      the proxy the player will be moved on
    * @param serverName the name of the server, as configured in {@code [servers]}
