@@ -48,8 +48,9 @@ On first start it creates:
 
 If you are upgrading, put the jar in place and start it. Anything from an older layout is moved
 into `config/` for you, contents intact. A stock Velocity `velocity.toml`, or this fork's earlier
-`hybridvelocity.toml` or `proxy.toml`, all become `config/HybridAuth.toml`, and an existing
-`forwarding.secret` is **moved, never regenerated**.
+`proxy.toml`, becomes `config/HybridAuth.toml`, and an existing `forwarding.secret` is **moved, never
+regenerated**. A file still called `hybridvelocity.toml` is no longer picked up: rename it to
+`config/HybridAuth.toml` yourself before starting.
 That last part matters: a new secret would be accepted silently by the proxy and rejected by every
 backend using modern forwarding.
 

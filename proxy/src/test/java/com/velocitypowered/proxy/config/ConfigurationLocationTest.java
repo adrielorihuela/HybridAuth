@@ -17,6 +17,7 @@
 
 package com.velocitypowered.proxy.config;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -52,21 +53,43 @@ class ConfigurationLocationTest {
 
   @Test
   void forkConfigurationLeftInTheRootIsMovedIn() throws IOException {
-    Files.writeString(dir.resolve("hybridvelocity.toml"), "motd = \"mine\"");
+    Files.writeString(dir.resolve("proxy.toml"), "motd = \"mine\"");
 
     final Path resolved = ConfigurationLocation.resolve(dir);
 
     assertEquals(dir.resolve("config").resolve("HybridAuth.toml"), resolved);
     assertEquals("motd = \"mine\"", Files.readString(resolved));
-    assertFalse(Files.exists(dir.resolve("hybridvelocity.toml")));
+    assertFalse(Files.exists(dir.resolve("proxy.toml")));
   }
 
   @Test
   void theForkFileWinsOverUpstreams() throws IOException {
-    Files.writeString(dir.resolve("hybridvelocity.toml"), "motd = \"fork\"");
+    Files.writeString(dir.resolve("proxy.toml"), "motd = \"fork\"");
     Files.writeString(dir.resolve("velocity.toml"), "motd = \"upstream\"");
 
     assertEquals("motd = \"fork\"", Files.readString(ConfigurationLocation.resolve(dir)));
+  }
+
+  @Test
+  void previousNamesAreTheLiteralsThatExistedBefore() {
+    // Out of date on purpose. A search and replace of a project rename must not touch these:
+    // if it does, installations still carrying the old name start on stock defaults.
+    assertArrayEquals(new String[]{"proxy.toml", "velocity.toml"},
+        ConfigurationLocation.PREVIOUS_NAMES);
+  }
+
+  @Test
+  void hybridvelocityTomlIsNoLongerPickedUp() throws IOException {
+    // Dropped in 1.3.1: the 1.3.1 notes tell operators to rename it by hand before upgrading.
+    final Path dropped = dir.resolve("config").resolve("hybridvelocity.toml");
+    Files.createDirectories(dropped.getParent());
+    Files.writeString(dropped, "motd = \"old\"");
+
+    final Path resolved = ConfigurationLocation.resolve(dir);
+
+    assertEquals(dir.resolve("config").resolve("HybridAuth.toml"), resolved);
+    assertFalse(Files.exists(resolved));
+    assertTrue(Files.exists(dropped));
   }
 
   @Test
@@ -79,21 +102,6 @@ class ConfigurationLocationTest {
     assertEquals("motd = \"current\"", Files.readString(ConfigurationLocation.resolve(dir)));
     // The stale one is not consulted, and not deleted either - that is the operator's to do.
     assertTrue(Files.exists(dir.resolve("velocity.toml")));
-  }
-
-  @Test
-  void olderNameAlreadyInsideConfigIsRenamed() throws IOException {
-    // Somebody who upgraded through 1.1.3, where config/ existed but the file was still named
-    // after the fork.
-    final Path older = dir.resolve("config").resolve("hybridvelocity.toml");
-    Files.createDirectories(older.getParent());
-    Files.writeString(older, "motd = \"mine\"");
-
-    final Path resolved = ConfigurationLocation.resolve(dir);
-
-    assertEquals(dir.resolve("config").resolve("HybridAuth.toml"), resolved);
-    assertEquals("motd = \"mine\"", Files.readString(resolved));
-    assertFalse(Files.exists(older));
   }
 
   @Test

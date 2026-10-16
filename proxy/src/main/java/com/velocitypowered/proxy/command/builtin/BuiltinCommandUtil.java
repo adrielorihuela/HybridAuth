@@ -32,18 +32,16 @@ class BuiltinCommandUtil {
   static final String PERMISSION_PREFIX = "hybridauth.command.";
 
   /**
-   * Prefixes these nodes have used before, still honoured as fallbacks.
+   * Prefixes still honoured as fallbacks when the current node is unset.
    *
    * <p>A rename that silently revokes access an operator has already granted is a rename that
-   * breaks their server, and they would have no way to connect the two events. So every prefix
-   * this project has used keeps working: {@code hybridvelocity.} from the first rename and
-   * {@code velocity.} from upstream. They are literals on purpose — a name that existed in the
-   * past must never be renamed along with the current one, or the fallback stops finding
-   * anything. They can be dropped in a future major version, once nobody is
-   * running a permissions setup that predates them.</p>
+   * breaks their server, and they would have no way to connect the two events. So upstream
+   * Velocity's {@code velocity.} keeps working, and pointing this jar at a stock Velocity
+   * installation keeps its permissions. It is a literal on purpose — a name from upstream must
+   * never be renamed along with the current one, or the fallback stops finding anything.
+   * ({@code hybridvelocity.}, this fork's own pre-rename prefix, was dropped in 1.3.1.)</p>
    */
-  static final String[] LEGACY_PERMISSION_PREFIXES = {
-      "hybridvelocity.command.", "velocity.command."};
+  static final String[] LEGACY_PERMISSION_PREFIXES = {"velocity.command."};
 
   private BuiltinCommandUtil() {
     throw new AssertionError();

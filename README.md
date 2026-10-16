@@ -142,8 +142,9 @@ Java 25 is required.
 
 Upgrading from stock Velocity? Swap the jar and start it. Your `velocity.toml` is moved to
 `config/HybridAuth.toml` with its contents intact, and your `forwarding.secret` is moved rather
-than regenerated. Permissions keep working: the `velocity.command.*` nodes are still honoured
-alongside the new `hybridauth.command.*` ones.
+than regenerated. Permissions keep working: a `velocity.command.*` node is still honoured wherever
+the matching `hybridauth.command.*` node is not set. `/velocity` still works too, as an alias of
+`/hybridauth`.
 
 Then read [docs/guide/getting-started.md](docs/guide/getting-started.md).
 

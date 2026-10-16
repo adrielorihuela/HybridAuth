@@ -279,9 +279,10 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
     commandManager.register(
         commandManager.metaBuilder(velocityParentCommand)
             .plugin(VelocityVirtualPlugin.INSTANCE)
-            // `ha` and `hv` because the full name is a mouthful, and the two older names because
-            // that is what anyone coming from upstream or from an earlier version will type.
-            .aliases("ha", "hv", "hybridvelocity", "velocity")
+            // `velocity` because that is what anyone coming from upstream will type. It is the
+            // only alias: 1.3.1 dropped the short `ha` and `hv` and the pre-rename
+            // `hybridvelocity`.
+            .aliases("velocity")
             .build(),
         velocityParentCommand
     );

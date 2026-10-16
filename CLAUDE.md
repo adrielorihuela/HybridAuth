@@ -47,15 +47,16 @@ Fork-specific behaviour:
   immediately before `loadPlugins()`. See `docs/guide/getting-started.md`.
 
 The configuration is `config/HybridAuth.toml`. `ConfigurationLocation` owns that directory and
-moves any earlier name into place on first start — `proxy.toml`, `hybridvelocity.toml` and
-upstream's `velocity.toml`, in `config/` or in the proxy root — along with `forwarding.secret`. The
+moves any earlier name into place on first start — `proxy.toml` and upstream's `velocity.toml`, in
+`config/` or in the proxy root — along with `forwarding.secret`. (`hybridvelocity.toml` stopped being
+read in 1.3.1, by the owner's decision; the 1.3.1 notes tell operators to rename it by hand.) The
 secret is **moved and never regenerated**: a fresh one is accepted by the proxy and rejected by
 every backend on modern forwarding, with no error anywhere to explain it. The `.toml` extension is
 load-bearing, since night-config picks its parser from it.
 
-Permission nodes are `hybridauth.command.*`, and every prefix the project has used is still read as
-a fallback. See **Renames, and the literals that must survive them** below — that fallback has been
-broken twice by search-and-replace.
+Permission nodes are `hybridauth.command.*`, and upstream's `velocity.command.*` is still read as a
+fallback when the `hybridauth` node is unset. See **Renames, and the literals that must survive
+them** below — that fallback has been broken twice by search-and-replace.
 
 Keep diffs against upstream narrow so upstream merges stay manageable.
 
@@ -253,11 +254,19 @@ configuration file three times. Both renames were done with a tree-wide search a
 **both times that quietly broke the compatibility they were supposed to preserve** by rewriting the
 old name inside the fallback list as well. Tests caught it; a person would not have.
 
-So: `LEGACY_PERMISSION_PREFIXES` in `BuiltinCommandUtil` and `PREVIOUS_NAMES` in
-`ConfigurationLocation` hold **string literals of names that no longer exist**. They are correct
-precisely because they are out of date, and a search and replace must never touch them. There are
-tests for both, and they are the only thing standing between a rename and somebody's granted
-permissions silently disappearing.
+So: `LEGACY_PERMISSION_PREFIXES` in `BuiltinCommandUtil` (`"velocity.command."`) and
+`PREVIOUS_NAMES` in `ConfigurationLocation` (`"proxy.toml"`, `"velocity.toml"`) hold **string
+literals of names this project no longer uses**. They are correct precisely because they are out of
+date, and a search and replace must never touch them. There are tests pinning both lists, and they
+are the only thing standing between a rename and somebody's granted permissions silently
+disappearing.
+
+1.3.1 deliberately shortened both lists, which is not the same thing as a rename breaking them: the
+fork's own intermediate name is gone everywhere — the `hybridvelocity` command alias,
+`hybridvelocity.command.*` and `hybridvelocity.toml` — along with the `/ha` and `/hv` shortcuts.
+Only `hybridauth` and upstream's `velocity` remain. Do not add the intermediate name back as an
+alias, a prefix or a file name, and do not drop `velocity` from either list: that is what keeps a
+stock Velocity installation working when this jar is dropped into it.
 
 ### Plugin auto-update
 
@@ -385,7 +394,7 @@ database lookup — the `requires` predicates run earlier, while the answer is s
 
 Commands are Brigadier nodes registered through `VelocityCommandManager`, which lowercases
 aliases (so commands are case-insensitive regardless of the literal's casing). The proxy's own
-command is `/hybridauth`, with `ha`, `hv`, `hybridvelocity` and `velocity` as aliases.
+command is `/hybridauth`, with `velocity` as its only alias.
 
 Permissions are tri-state and are checked **only** through the two helpers in
 `command/builtin/BuiltinCommandUtil.java`, never by calling `getPermissionValue` directly. Nodes are

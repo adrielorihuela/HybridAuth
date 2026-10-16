@@ -31,8 +31,8 @@ import org.apache.logging.log4j.Logger;
  * Where this fork keeps its configuration: a {@code config/} directory next to the jar.
  *
  * <p>The file inside it is {@code HybridAuth.toml}. An installation still holding any earlier name
- * — {@code proxy.toml}, {@code hybridvelocity.toml} or upstream Velocity's {@code velocity.toml},
- * in {@code config/} or in the proxy root — has it moved on first start. Without that, updating the jar would silently
+ * — {@code proxy.toml} or upstream Velocity's {@code velocity.toml}, in {@code config/} or in
+ * the proxy root — has it moved on first start. Without that, updating the jar would silently
  * start the proxy on stock defaults and lose every configured server, the forwarding mode and the
  * MOTD. Pointing this jar at an existing Velocity installation is therefore the whole
  * migration.</p>
@@ -67,10 +67,11 @@ public final class ConfigurationLocation {
    * <p>These are literals on purpose: they are names that existed in the past and must never be
    * renamed along with anything else, or an installation carrying one stops being found.
    * {@code velocity.toml} is upstream's, and it is here so that pointing this jar at an existing
-   * Velocity installation is the whole migration — no step to follow and none to forget.</p>
+   * Velocity installation is the whole migration — no step to follow and none to forget.
+   * {@code hybridvelocity.toml}, the fork's first name, was dropped in 1.3.1 and has to be
+   * renamed by hand.</p>
    */
-  private static final String[] PREVIOUS_NAMES = {
-      "proxy.toml", "hybridvelocity.toml", "velocity.toml"};
+  static final String[] PREVIOUS_NAMES = {"proxy.toml", "velocity.toml"};
 
   /** The name upstream Velocity uses. */
   public static final String LEGACY_FILE_NAME = "velocity.toml";
