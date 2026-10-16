@@ -15,7 +15,7 @@ mistake being made twice.
 | --- | --- |
 | `docs/guide/` | How an operator uses the fork. Start at `docs/guide/getting-started.md`. |
 | `docs/development/README.md` | Why the fork is built this way: the specification, the attempt that failed, the protocol research, the architecture chosen. |
-| `docs/development/updating-upstreams.md` | **How to pull changes from Velocity or NanoLimbo.** Read this before any upstream work — merging and rebasing are not interchangeable here. It runs weekly by itself; this page also says what to do when it stops for review. |
+| `docs/development/updating-upstreams.md` | **How to pull changes from Velocity or NanoLimbo.** Read this before any upstream work — merging and rebasing are not interchangeable here. It runs hourly by itself, with Claude resolving in CI what needs judgment; this page also says what to do when it stops for review. |
 | `docs/development/releasing.md` | **How releases happen**: every change reaching `main` is released, with the version taken from the commit subjects. Read it before choosing a commit subject or bumping `forkVersion`. |
 | `docs/development/auth-server.md` | The vendored subtree, its three local patches, and why each exists. |
 
@@ -110,7 +110,7 @@ Apply formatting — run before committing, the build fails on style violations.
 ./gradlew updateUpstreams
 ```
 
-Update both upstreams by hand (the weekly workflow runs this same task; see **Releases and upstream
+Update both upstreams by hand (the hourly workflow runs this same task; see **Releases and upstream
 updates run themselves**): adds the `upstream` and `limbo-upstream` remotes if a clone is missing them,
 merges Velocity, pulls the NanoLimbo subtree with the flags it requires, and prints what to check
 afterwards. Both fetches pass `--no-tags`, which is load-bearing: NanoLimbo numbers its releases
@@ -171,12 +171,24 @@ those notes are used as they are. A hyphenated `forkVersion` (`1.4.0-beta.1`) on
 pre-release for testing before a merge, deleted when its stable version comes out. Full detail:
 `docs/development/releasing.md`.
 
-**`.github/workflows/upstream.yml` merges Velocity and NanoLimbo every Monday.** It resolves the one
-mechanical conflict (`gradle.properties` / `libs.versions.toml`, key by key), runs the review checks
-in `.github/scripts/review-checks.sh`, builds, starts the jar, and — only if all of that passes —
-pushes to `main` and releases a patch with notes from `docs/releases/TEMPLATE-upstream.md` saying it
-was automatic. Otherwise nothing reaches `main`: the merge waits on `upstream-update/<date>` with
-drafted notes, and an issue labelled `upstream-update` says what needs judgment.
+**`.github/workflows/upstream.yml` checks both upstreams every hour** (`git ls-remote`, seconds, no
+build) and only when one has commits `main` lacks does it merge them. It resolves the one mechanical
+conflict (`gradle.properties` / `libs.versions.toml`, key by key), runs the review checks in
+`.github/scripts/review-checks.sh`, builds, starts the jar, and — only if all of that passes — pushes
+to `main` and releases a patch with notes from `docs/releases/TEMPLATE-upstream.md` saying it was
+automatic. It never redoes the same upstream commits: the issue and release commit carry
+`<!-- upstream velocity=<sha> limbo=<sha> -->`, and an open issue with the current marker means
+nothing happens.
+
+When something needs judgment and the `CLAUDE_CODE_OAUTH_TOKEN` secret is set, **Claude resolves it
+in the same run, on the runner**, with the prompt in **`.github/claude/resolve-upstream.md`** (edit
+that file to change what Claude in CI is told). Claude edits and commits only — no Gradle, no push,
+no token. `claude-rounds.sh` loops up to three rounds: after each, `verify-resolution.sh` builds,
+starts the jar and checks the result, and `extract-failure.py` hands only the relevant error to the
+next round. A passing round is pushed to `main` and released, and the issue gets Claude's summary
+and is closed. Otherwise, or without the secret, nothing reaches `main`: the merge waits on
+`upstream-update/<date>` and an issue labelled `upstream-update` says what needs judgment and what
+Claude tried.
 
 **When asked to resolve an upstream update**, follow "When it stops for review" in
 `docs/development/updating-upstreams.md`: deal with every reason in the issue, replace every
