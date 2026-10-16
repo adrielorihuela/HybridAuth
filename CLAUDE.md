@@ -196,6 +196,11 @@ Claude tried.
 start the jar, and merge into `main` through a pull request from the session branch. The release
 then goes out with those notes.
 
+The subscription token lasts one year: `claude-check.yml` tests it monthly and opens a `claude-token`
+issue when it needs renewing (`claude setup-token`, then update the secret). GitHub disables
+schedules after 60 days without commits, so the upstream `check` job re-enables them daily, and
+`branch-cleanup.yml` deletes branches whose commits are all in `main`.
+
 Pushes made with `GITHUB_TOKEN` start no workflow — that is why the release commit cannot loop, and
 why `upstream.yml` starts `release.yml` with `workflow_dispatch`. The scripts in `.github/scripts/`
 run locally too; test a change to one against real history before pushing it (the 4.2.0 merge,

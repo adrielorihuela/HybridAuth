@@ -1,0 +1,87 @@
+# Checks that the CLAUDE_CODE_OAUTH_TOKEN secret still works, before an upstream update needs it.
+#
+# The token `claude setup-token` makes lasts one year, and nothing else would notice it expiring:
+# the upstream update only calls Claude when something needs judgment, which may be months away.
+# So this asks Claude for one word on the first of every month, and on demand from Actions ->
+# Claude token check -> Run workflow. A failure opens (or updates) an issue labelled claude-token
+# saying how to renew it; a later success closes it. See docs/development/updating-upstreams.md.
+
+name: Claude token check
+on:
+  schedule:
+    - cron: '41 7 1 * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+    - name: Ask Claude for one word
+      id: ask
+      env:
+        CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      run: |
+        if [ -z "${CLAUDE_CODE_OAUTH_TOKEN}" ]; then
+          echo "The CLAUDE_CODE_OAUTH_TOKEN secret is not set." | tee "${RUNNER_TEMP}/reason.txt"
+          echo "ok=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        set +e
+        answer="$(timeout 5m npx -y @anthropic-ai/claude-code -p "Reply with exactly the word OK and nothing else." \
+          --max-turns 1 < /dev/null 2>&1)"
+        status=$?
+        set -e
+        echo "Claude exited with ${status}. It answered:"
+        echo "${answer}" | tail -n 20
+        if [ "${status}" -eq 0 ] && grep -qx 'OK' <<< "$(echo "${answer}" | tr -d '[:space:]')"; then
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+        else
+          { echo "Claude exited with ${status} and answered:"; echo; echo '```'; echo "${answer}" | tail -n 20; echo '```'; } \
+            > "${RUNNER_TEMP}/reason.txt"
+          echo "ok=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Report
+      env:
+        GH_TOKEN: ${{ github.token }}
+        OK: ${{ steps.ask.outputs.ok }}
+      run: |
+        open="$(gh issue list --repo "${GITHUB_REPOSITORY}" --label claude-token --state open \
+          --json number --jq '.[0].number // empty')"
+        if [ "${OK}" = "true" ]; then
+          echo "The Claude token works."
+          if [ -n "${open}" ]; then
+            gh issue close "${open}" --repo "${GITHUB_REPOSITORY}" \
+              --comment "The token works again (run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})."
+          fi
+          exit 0
+        fi
+        {
+          echo "The Claude token used by the upstream update does not work, so an update that needs"
+          echo "judgment would wait for a person instead of being resolved by Claude."
+          echo
+          cat "${RUNNER_TEMP}/reason.txt"
+          echo
+          echo "## To fix it"
+          echo
+          echo "1. On a computer with Claude Code, logged in with a Pro/Max plan, run \`claude setup-token\`."
+          echo "   It prints a token valid for one year."
+          echo "2. In this repository: Settings -> Secrets and variables -> Actions -> \`CLAUDE_CODE_OAUTH_TOKEN\` -> Update, and paste it."
+          echo "3. Actions -> Claude token check -> Run workflow. A green run closes this issue."
+          echo
+          echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+        } > "${RUNNER_TEMP}/issue.md"
+        gh label create claude-token --repo "${GITHUB_REPOSITORY}" --color d93f0b \
+          --description "The Claude token for CI needs renewing" --force
+        if [ -n "${open}" ]; then
+          gh issue comment "${open}" --repo "${GITHUB_REPOSITORY}" --body-file "${RUNNER_TEMP}/issue.md"
+        else
+          gh issue create --repo "${GITHUB_REPOSITORY}" --label claude-token \
+            --title "The Claude token for CI does not work" --body-file "${RUNNER_TEMP}/issue.md"
+        fi
+        echo "::error::The Claude token does not work; see the claude-token issue."
+        exit 1

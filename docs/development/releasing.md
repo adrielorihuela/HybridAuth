@@ -71,6 +71,12 @@ Pushing a `v<version>` tag by hand still releases that tag, as long as it matche
 - **Run it again by hand:** Actions → Release → *Run workflow* on `main`. It releases whatever is
   unreleased, or says there is nothing to do.
 
+## Branches clean themselves up
+
+`.github/workflows/branch-cleanup.yml` deletes a pull request's branch when it is merged, unless
+something was pushed to it afterwards, and every week deletes any branch whose commits are all in
+`main`. A branch with work not in `main`, or with an open pull request, is never deleted.
+
 ## One thing GitHub does on purpose
 
 Pushes made with the workflow's own `GITHUB_TOKEN` start no other workflow. That is what stops the

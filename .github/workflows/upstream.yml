@@ -64,6 +64,24 @@ jobs:
         fetch-depth: 0
         filter: blob:none
         persist-credentials: false
+    # In a public repository GitHub switches scheduled workflows off after 60 days with no commits,
+    # silently, and both upstreams can easily go that long. Enabling a workflow through the API
+    # restarts that count, so once a day (and on every manual run) this does it for the scheduled
+    # workflows. A failure here is reported, never fatal: the check itself matters more.
+    - name: Keep the schedules alive
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        if [ "${GITHUB_EVENT_NAME}" = "schedule" ] && [ "$(date -u +%H)" != "00" ]; then
+          exit 0
+        fi
+        for workflow in upstream.yml claude-check.yml branch-cleanup.yml; do
+          if gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow}/enable" --silent; then
+            echo "Kept ${workflow} enabled."
+          else
+            echo "::warning::Could not re-enable ${workflow}; its schedule may lapse after 60 days without commits."
+          fi
+        done
     - name: Look for new upstream commits
       id: new
       run: .github/scripts/upstream-check.sh | tee -a "$GITHUB_OUTPUT"
@@ -337,6 +355,7 @@ jobs:
               needs-human) echo "Claude decided at least one reason needs a person, and said why:" ;;
               failed) echo "Claude's resolution did not pass in $(cat "${WORK}/claude/rounds" 2>/dev/null || echo 3) round(s). Its commits are on the branch below, as a starting point." ;;
               unresolved-conflict) echo "Claude could not conclude the conflicted merge." ;;
+              auth-failed) echo "Claude could not run at all: the token was refused." ;;
               passed) echo "Claude's resolution passed, but \`main\` moved while it worked, so it was not pushed. It is on the branch below; merging it is all that is left." ;;
               *) echo "The Claude step did not finish (${CLAUDE_RESULT:-no result}); see the run's log." ;;
             esac
