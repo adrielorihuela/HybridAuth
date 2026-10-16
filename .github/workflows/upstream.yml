@@ -1,9 +1,12 @@
 # Keeps the fork up to date with upstream Velocity and NanoLimbo, by itself where that is safe.
 # How it works and what to do when it stops: docs/development/updating-upstreams.md.
 #
-# Every Monday (or on demand) it merges both upstreams into main the documented way and decides:
+# Every hour (or on demand) the check job asks both upstreams, in seconds and without building,
+# whether they have commits main does not. Only then does the update job merge them into main the
+# documented way and decide:
 #
-#   - Nothing new upstream: nothing happens.
+#   - Nothing new upstream, or nothing new since the update already waiting in an open
+#     upstream-update issue (its marker names the exact commits): nothing happens.
 #   - Merged, the build and the smoke test pass, and no review check fires: the update is pushed to
 #     main and released as the next patch version, with notes from
 #     docs/releases/TEMPLATE-upstream.md saying that, and why nobody needed to look at it.
@@ -14,9 +17,16 @@
 
 name: Upstream update
 on:
+  # Hourly, off minute 0, which GitHub delays. Nothing can tell this repository when PaperMC or
+  # Nan1t push, so it asks; the check costs a few seconds when there is nothing new.
   schedule:
-    - cron: '17 6 * * 1'
+    - cron: '23 * * * *'
   workflow_dispatch:
+    inputs:
+      force:
+        description: Redo the update even if an open upstream-update issue already covers these upstream commits
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -28,7 +38,48 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  check:
+    runs-on: ubuntu-24.04
+    outputs:
+      run: ${{ steps.handled.outputs.run }}
+      limbo: ${{ steps.new.outputs.limbo }}
+    steps:
+    - name: Checkout main
+      uses: actions/checkout@v6
+      with:
+        ref: main
+        # Whole history, to ask whether upstream's tip is in it; no file contents, which it never reads.
+        fetch-depth: 0
+        filter: blob:none
+        persist-credentials: false
+    - name: Look for new upstream commits
+      id: new
+      run: .github/scripts/upstream-check.sh | tee -a "$GITHUB_OUTPUT"
+    # An update that stopped for review stays stopped until somebody resolves it or upstream moves:
+    # redoing it every hour would only repeat the same issue, and the same work.
+    - name: Skip what is already waiting for review
+      id: handled
+      if: steps.new.outputs.new == 'true'
+      env:
+        GH_TOKEN: ${{ github.token }}
+        MARKER: ${{ steps.new.outputs.marker }}
+        FORCE: ${{ inputs.force }}
+      run: |
+        # The marker is hexadecimal shas and fixed text, so it is safe inside the jq string. A failed
+        # lookup redoes the update rather than skipping it.
+        issue="$(gh issue list --repo "${GITHUB_REPOSITORY}" --label upstream-update --state open \
+          --json number,body --jq ".[] | select(.body | contains(\"${MARKER}\")) | .number" \
+          | head -n 1)" || issue=""
+        if [ "${FORCE}" != "true" ] && [ -n "${issue}" ]; then
+          echo "These upstream commits are already waiting for review in #${issue}. Nothing to do."
+          echo "run=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "run=true" >> "$GITHUB_OUTPUT"
+        fi
+
   update:
+    needs: check
+    if: needs.check.outputs.run == 'true'
     runs-on: ubuntu-24.04
     env:
       WORK: ${{ github.workspace }}/../upstream-work
@@ -81,6 +132,8 @@ jobs:
 
     - name: Decide
       id: decide
+      env:
+        CHECK_LIMBO: ${{ needs.check.outputs.limbo }}
       run: |
         status="${{ steps.merge.outputs.status }}"
         reasons="${WORK}/reasons.txt"
@@ -107,6 +160,11 @@ jobs:
         IFS=. read -r major minor patch <<< "${previous#v}"
         echo "previous=${previous}" >> "$GITHUB_OUTPUT"
         echo "version=${major}.${minor}.$((patch + 1))" >> "$GITHUB_OUTPUT"
+        # What this update was made from, as fetched; the check job compares the next tips with it.
+        # NanoLimbo is not fetched when Velocity's merge stopped first, so its tip is the check's.
+        velocity="$(git rev-parse upstream/dev/4.0.0)"
+        limbo="$(git rev-parse -q --verify limbo-upstream/main || echo "${CHECK_LIMBO}")"
+        echo "marker=<!-- upstream velocity=${velocity} limbo=${limbo} -->" >> "$GITHUB_OUTPUT"
 
     # Release as a patch: an upstream update that needed nobody changes nothing this fork adds.
     - name: Release automatically
@@ -114,6 +172,7 @@ jobs:
       env:
         VERSION: ${{ steps.decide.outputs.version }}
         PREVIOUS: ${{ steps.decide.outputs.previous }}
+        MARKER: ${{ steps.decide.outputs.marker }}
       run: |
         sed -i "s/^forkVersion=.*/forkVersion=${VERSION}/" gradle.properties
         python3 -I .github/scripts/render-notes.py upstream --mode auto --version "${VERSION}" \
@@ -122,7 +181,8 @@ jobs:
           > "docs/releases/${VERSION}.md"
         git add gradle.properties "docs/releases/${VERSION}.md"
         git commit -m "chore: release ${VERSION} (automatic upstream update)" \
-          -m "The weekly upstream update merged cleanly, built, started, and fired no review check, so it is released without anyone. See docs/releases/${VERSION}.md."
+          -m "The upstream update merged cleanly, built, started, and fired no review check, so it is released without anyone. See docs/releases/${VERSION}.md." \
+          -m "${MARKER}"
         git push origin HEAD:main
         # Pushes made with GITHUB_TOKEN start no workflow, so the release is started by hand.
         gh workflow run release.yml --ref main
@@ -137,6 +197,7 @@ jobs:
         VERSION: ${{ steps.decide.outputs.version }}
         PREVIOUS: ${{ steps.decide.outputs.previous }}
         STATUS: ${{ steps.merge.outputs.status }}
+        MARKER: ${{ steps.decide.outputs.marker }}
       run: |
         run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
         branch=""
@@ -149,13 +210,14 @@ jobs:
             --resolved "${WORK}/resolved.txt" > "docs/releases/${VERSION}.md"
           git add gradle.properties "docs/releases/${VERSION}.md"
           git commit -m "chore: release ${VERSION} (upstream update, needs review)" \
-            -m "Drafted by the weekly upstream update, which stopped for review. Not on main until somebody finishes it."
+            -m "Drafted by the upstream update, which stopped for review. Not on main until somebody finishes it." \
+            -m "${MARKER}"
           branch="upstream-update/$(date -u +%F)"
           git push --force origin "HEAD:refs/heads/${branch}"
         fi
 
         {
-          echo "The weekly upstream update stopped, because something in it needs judgment rather than a script."
+          echo "The upstream update stopped, because something in it needs judgment rather than a script."
           echo
           echo "## What needs review"
           echo
@@ -185,13 +247,20 @@ jobs:
           echo "3. Finish \`docs/releases/${VERSION}.md\`: fill in the \`MANUAL\` sections with what was found and what was done."
           echo "4. \`./gradlew build\`, then start the jar and check the boot line and the authentication server."
           echo "5. Merge into \`main\` (a merge, never a squash or rebase). \`release.yml\` releases \`v${VERSION}\` with those notes, and closing this issue is the last step."
+          echo
+          echo "While this issue is open, the hourly update does not redo these upstream commits; it redoes the update, and rewrites this description, when upstream gets new ones."
+          echo
+          echo "${MARKER}"
         } > "${WORK}/issue.md"
 
         gh label create upstream-update --color d93f0b \
           --description "An upstream update waiting for review" --force
         existing="$(gh issue list --label upstream-update --state open --json number --jq '.[0].number // empty')"
         if [ -n "${existing}" ]; then
-          gh issue comment "${existing}" --body-file "${WORK}/issue.md"
+          # The description is what the check job reads, so it always describes the latest attempt.
+          gh issue edit "${existing}" --title "Upstream update needs review (v${VERSION})" \
+            --body-file "${WORK}/issue.md"
+          gh issue comment "${existing}" --body "Upstream has new commits, so the update was redone: ${run_url}. The description above is updated."
           echo "Updated issue #${existing}."
         else
           gh issue create --title "Upstream update needs review (v${VERSION})" \

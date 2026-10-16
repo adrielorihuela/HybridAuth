@@ -1,5 +1,5 @@
 <!--
-  Template for the notes of a release made by the weekly upstream update
+  Template for the notes of a release made by the upstream update
   (.github/workflows/upstream.yml). .github/scripts/render-notes.py fills in the {{placeholders}}.
 
   Automatic: every check passed, so the update was merged and released without anyone.

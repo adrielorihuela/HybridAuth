@@ -6,7 +6,7 @@
                            --velocity-ref REF [--reasons FILE] [--resolved FILE]
 
 `release` is for a release published because a change reached main (docs/releases/TEMPLATE.md).
-`upstream` is for the weekly upstream update (docs/releases/TEMPLATE-upstream.md); in manual mode it
+`upstream` is for the upstream update (docs/releases/TEMPLATE-upstream.md); in manual mode it
 drafts the notes with MANUAL sections for whoever resolves the update to fill in.
 
 The rendered notes go to standard output. Test counts are read from the build's JUnit reports, so
@@ -165,7 +165,7 @@ def upstream(args: argparse.Namespace) -> str:
         "registration portals rely on, and the NanoLimbo patches — and none fired",
     ]
     if manual:
-        how = ("**Not automatically.** The weekly upstream update stopped because something needed "
+        how = ("**Not automatically.** The upstream update stopped because something needed "
                "a person or Claude to look at it:\n\n"
                + "\n".join(f"- {reason}" for reason in reasons)
                + "\n\n### What was done\n\n<!-- MANUAL: what was found for each point above, what "
@@ -174,7 +174,7 @@ def upstream(args: argparse.Namespace) -> str:
             "<!-- MANUAL: anything the fork had to change for this update, or \"Nothing.\" -->")
         intro_tail = "<!-- MANUAL: one or two sentences on what matters in this update. -->"
     else:
-        how = ("**Automatically.** The weekly upstream update merged this, and everything that "
+        how = ("**Automatically.** The upstream update merged this, and everything that "
                "would have needed a person passed, so it was merged into `main` and released "
                "without anyone:\n\n" + "\n".join(f"- {check}" for check in checks)
                + "\n\nThese notes were generated from `docs/releases/TEMPLATE-upstream.md`.")
