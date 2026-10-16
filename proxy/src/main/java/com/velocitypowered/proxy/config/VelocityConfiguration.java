@@ -1275,6 +1275,16 @@ public class VelocityConfiguration implements ProxyConfig {
     }
 
     /**
+     * Returns whether any portal on {@code origin} sends players elsewhere.
+     *
+     * @param origin the server the player is on
+     * @return whether {@code origin} has an entry
+     */
+    public boolean redirectsFrom(final String origin) {
+      return redirects.containsKey(origin.toLowerCase(Locale.ROOT));
+    }
+
+    /**
      * Returns the server a portal on {@code origin} leading to {@code dimension} sends players to.
      *
      * @param origin the server the player is on
