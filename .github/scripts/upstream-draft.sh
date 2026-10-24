@@ -21,7 +21,9 @@ here="$(cd "$(dirname "$0")" && pwd)"
 notes="docs/releases/${VERSION}.md"
 
 sed -i "s/^forkVersion=.*/forkVersion=${VERSION}/" gradle.properties
-args=(upstream --mode "${mode}" --version "${VERSION}" --previous "${PREVIOUS}" --base "${BASE}"
+# The notes list everything since the last release, not since BASE: when an update reached main but
+# its release did not go out, the next one reuses the version and must not drop those commits.
+args=(upstream --mode "${mode}" --version "${VERSION}" --previous "${PREVIOUS}" --base "${PREVIOUS}"
   --velocity-ref upstream/dev/4.0.0 --resolved "${work}/resolved.txt")
 if [ "${mode}" = "manual" ]; then
   args+=(--reasons "${work}/reasons.txt")

@@ -167,6 +167,17 @@ except that the workflow builds and merges for it). Asked to "resolve the upstre
 Claude's sessions can only push to their own branch, so the merge into `main` goes through a pull
 request from that branch.
 
+### When an update reached `main` but was not released
+
+The automatic path pushes to `main` first and starts `release.yml` second, so a failure in between
+leaves `forkVersion` and its notes on `main` with no tag. Later runs see the marker and do nothing,
+so nothing retries it. Start **Release** by hand on `main` (Actions → Release → Run workflow):
+`next-version.sh` finds an unreleased `forkVersion` and publishes it with the notes as they are.
+That is how 1.3.2 went out: four updates in a row merged and then failed because `gh` was looking
+for `release.yml` in PaperMC/Velocity (fixed with `GH_REPO` in `upstream.yml`). Since then the notes
+list every upstream commit since the last tag, so an update that reuses an unreleased version adds
+to its notes instead of replacing them.
+
 ## The short version
 
 ```bash
