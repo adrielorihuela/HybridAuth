@@ -44,6 +44,14 @@ update)`, and `release.yml` publishes it. Nobody is involved, and the notes say 
 
 When any row stops it, what happens next depends on whether Claude is set up.
 
+**Claude in CI is switched off.** Since November 2026, by the owner's decision, an update that needs
+judgment is never resolved on the runner: it stops, and the merge waits on `upstream-update/<date>`
+with an issue, as [Without Claude](#without-claude-or-when-it-does-not-get-there) describes, until
+a person or a Claude session finishes it ([When it stops for review](#when-it-stops-for-review)).
+Updates that need nobody still go out by themselves. The machinery below is kept: setting the
+repository variable **`UPSTREAM_CLAUDE`** to `true` (*Settings → Secrets and variables → Actions →
+Variables*), with the secret set, turns it back on, together with the monthly token check.
+
 ### Claude's part
 
 With the repository secret `CLAUDE_CODE_OAUTH_TOKEN` set, the same run hands the update to Claude.
@@ -100,7 +108,8 @@ claude setup-token
 
 and save the token it prints as a repository secret named **`CLAUDE_CODE_OAUTH_TOKEN`**, in the
 repository's *Settings → Secrets and variables → Actions → New repository secret*. The next update
-that stops for review uses it. To turn Claude off, delete the secret.
+that stops for review uses it, provided `UPSTREAM_CLAUDE` is `true`. To turn Claude off, set the
+variable to anything else or delete it (or delete the secret).
 
 **The token lasts one year**, and a subscription token cannot be made to last longer. Two things
 catch it running out before an update depends on it:

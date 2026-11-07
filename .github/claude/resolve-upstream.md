@@ -13,8 +13,10 @@ is in. Everything above it is the same every time.
 
 Read, in this order:
 
-1. `CLAUDE.md` — the project rules. The sections on renames, `config-version`, the authentication
-   server and the offline-auth gate describe mistakes that have already been made once.
+1. `CLAUDE.md` — the project rules, and its hard constraints above all. The detail on renames,
+   `config-version`, the authentication server and the offline-auth gate is in
+   `.claude/rules/renames.md`, `.claude/rules/configuration-and-wiring.md` and `.claude/rules/auth.md`:
+   read all three, since they describe mistakes that have already been made once.
 2. `docs/development/updating-upstreams.md`, especially **When it stops for review**, **When
    conflicts appear**, **After merging** and **Updating the authentication server**. Follow it.
 3. Whatever page those point to for the reasons you were given (for example
