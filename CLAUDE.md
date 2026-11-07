@@ -50,6 +50,7 @@ module.** Most of what is written there exists to stop a specific mistake being 
 | `docs/development/updating-upstreams.md` | **How to pull changes from Velocity or NanoLimbo** — merging and rebasing are not interchangeable here. Runs hourly by itself; also says what to do when it stops for review. |
 | `docs/development/releasing.md` | **How releases happen**: every change reaching `main` is released, versioned from commit subjects. |
 | `docs/development/auth-server.md` | The vendored subtree, its three local patches, and why each exists. |
+| `docs/development/hot-update-research.md` | Research (not implemented) on updating the proxy without disconnecting players; read it before any work on hot reload, a launcher or socket handover. |
 
 Fork-specific behaviour (each guide in `docs/guide/` explains it):
 

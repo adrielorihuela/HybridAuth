@@ -15,6 +15,7 @@ specific mistake from being made twice.
 | [auth-server.md](auth-server.md) | The vendored NanoLimbo subtree: layout, the local patches and why each exists. |
 | [updating-upstreams.md](updating-upstreams.md) | **How to pull changes from Velocity and NanoLimbo**: what the hourly workflow does by itself, where Claude resolves an update in CI and how to enable it, what to do when it stops for review, why merge rather than rebase, and what to check afterwards. |
 | [releasing.md](releasing.md) | **Every change that reaches `main` is released**: how the version and the notes are chosen, how to write the notes yourself, and pre-releases. |
+| [hot-update-research.md](hot-update-research.md) | **Research, not implemented**: updating the proxy and its plugins without disconnecting players — why it cannot happen inside one process, the relay between two processes, handing live sockets over, the launcher jar, and the owner's decisions. |
 | [discarded/](discarded/) | Analysis that was superseded. Kept so the options it rejects are not proposed again. |
 
 ## The short version
