@@ -1,0 +1,185 @@
+{
+  "comment": "LeanFlow escalation ladder for capability failures (trial E6). Rungs come from roles in lean-context key-figures.json; sync-skills rewrites this file when roles change. Effort rises within a model before the model changes (cache-safe); a model change means a fresh subagent. Top rung = the project's maxEffortLevel. Never effort max or a model outside roles without asking the user.",
+  "version": "2026.11.06b",
+  "classify_first": {
+    "env_signatures": [
+      "ECONNRESET",
+      "ETIMEDOUT",
+      "timed out",
+      "Could not resolve host",
+      "rate limit",
+      "429",
+      "503",
+      "No space left",
+      "Permission denied",
+      "ENOENT",
+      "command not found",
+      "flaky",
+      "passes on rerun"
+    ],
+    "env_action": "fix the environment or rerun once; never escalate on an environment failure"
+  },
+  "ladders": {
+    "implement": [
+      {
+        "rung": 1,
+        "model": "sonnet",
+        "model_id": "claude-sonnet-5-5",
+        "effort": "medium",
+        "score": 31,
+        "cost_per_task_usd": 0.78
+      },
+      {
+        "rung": 2,
+        "model": "sonnet",
+        "model_id": "claude-sonnet-5-5",
+        "effort": "high",
+        "score": 42,
+        "cost_per_task_usd": 1.64
+      },
+      {
+        "rung": 3,
+        "model": "opus",
+        "model_id": "claude-opus-5-5",
+        "effort": "medium",
+        "score": 48,
+        "cost_per_task_usd": 2.45
+      },
+      {
+        "rung": 4,
+        "model": "opus",
+        "model_id": "claude-opus-5-5",
+        "effort": "high",
+        "score": 52,
+        "cost_per_task_usd": 3.46
+      },
+      {
+        "rung": 5,
+        "model": "opus",
+        "model_id": "claude-opus-5-5",
+        "effort": "xhigh",
+        "score": 57,
+        "cost_per_task_usd": 6.05
+      }
+    ],
+    "explore": [
+      {
+        "rung": 1,
+        "model": "haiku",
+        "model_id": "claude-haiku-5-5",
+        "effort": "medium",
+        "score": 25,
+        "cost_per_task_usd": 0.09
+      },
+      {
+        "rung": 2,
+        "model": "haiku",
+        "model_id": "claude-haiku-5-5",
+        "effort": "high",
+        "score": 30,
+        "cost_per_task_usd": 0.16
+      },
+      {
+        "rung": 3,
+        "model": "haiku",
+        "model_id": "claude-haiku-5-5",
+        "effort": "xhigh",
+        "score": 35,
+        "cost_per_task_usd": 0.25
+      },
+      {
+        "rung": 4,
+        "model": "sonnet",
+        "model_id": "claude-sonnet-5-5",
+        "effort": "high",
+        "score": 42,
+        "cost_per_task_usd": 1.64
+      },
+      {
+        "rung": 5,
+        "model": "opus",
+        "model_id": "claude-opus-5-5",
+        "effort": "medium",
+        "score": 48,
+        "cost_per_task_usd": 2.45
+      },
+      {
+        "rung": 6,
+        "model": "opus",
+        "model_id": "claude-opus-5-5",
+        "effort": "high",
+        "score": 52,
+        "cost_per_task_usd": 3.46
+      },
+      {
+        "rung": 7,
+        "model": "opus",
+        "model_id": "claude-opus-5-5",
+        "effort": "xhigh",
+        "score": 57,
+        "cost_per_task_usd": 6.05
+      }
+    ],
+    "knowledge": [
+      {
+        "rung": 1,
+        "model": "sonnet",
+        "model_id": "claude-sonnet-5-5",
+        "effort": "high",
+        "score": 1557,
+        "cost_per_task_usd": 1.64
+      },
+      {
+        "rung": 2,
+        "model": "opus",
+        "model_id": "claude-opus-5-5",
+        "effort": "medium",
+        "score": 1593,
+        "cost_per_task_usd": 2.45
+      },
+      {
+        "rung": 3,
+        "model": "opus",
+        "model_id": "claude-opus-5-5",
+        "effort": "high",
+        "score": 1714,
+        "cost_per_task_usd": 3.46
+      },
+      {
+        "rung": 4,
+        "model": "opus",
+        "model_id": "claude-opus-5-5",
+        "effort": "xhigh",
+        "score": 1835,
+        "cost_per_task_usd": 6.05
+      },
+      {
+        "rung": 5,
+        "model": "opus",
+        "model_id": "claude-opus-5-5",
+        "effort": "max",
+        "score": 1866,
+        "cost_per_task_usd": 10.04
+      }
+    ]
+  },
+  "retries_at_top": 1,
+  "outside_preset_options": [
+    "fable at high",
+    "effort max"
+  ],
+  "ask_user_when": "top rung failed twice",
+  "ask_user_options": {
+    "implement": [],
+    "explore": [],
+    "knowledge": []
+  },
+  "built_by": "internal/scripts/ladder.py from key-figures.json effort_curves (efficient frontier, margin = loop.decision_margin_pp)",
+  "dropped_no_return": {
+    "implement": [
+      "opus low"
+    ],
+    "explore": [],
+    "knowledge": []
+  }
+}

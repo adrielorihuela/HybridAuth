@@ -1,10 +1,14 @@
 {
   "presets": {
     "lean-code": {
-      "version": "2026.11.06",
+      "version": "2026.11.07",
       "applied_on": "2026-11-07",
       "check_every_days": 7,
-      "last_check": "2026-11-07"
+      "last_check": "2026-11-07",
+      "log_hook": "object",
+      "telemetry": {
+        "enabled": true
+      }
     }
   }
 }

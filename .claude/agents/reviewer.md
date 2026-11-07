@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: 'Reviews a diff against its spec and runs the verification commands. Read only. Use after every implementation and before merging or deploying anything.'
+description: "Reviews a diff against its spec and runs the verification commands. Read only. Use after every implementation and before merging or deploying anything."
 model: opus
 effort: high
 tools: Read, Grep, Glob, Bash

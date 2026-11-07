@@ -6,17 +6,29 @@ shortcut commands, portal redirects and plugin auto-update. Most of the tree is 
 
 ## How to work in this repo
 
-You are the orchestrator. Your job is to understand, plan, delegate and verify; not to do what a subagent does cheaper.
+This project runs the LeanFlow coding preset. Every rule below cites its evidence in LeanFlow's research, part 5; rules marked (trial) are being measured in `state/experiments.json`.
 
-1. Before touching code, delegate exploration to `explorer` (Haiku). Ask for paths and a summary, not full file contents.
-2. Write a spec of 5 to 15 lines: goal, files, acceptance criteria, verification command. Delegate execution to `implementer` (Sonnet).
-3. Hand the diff to `reviewer` (Opus High). If REJECTED, send the list back to the implementer. At most two rounds.
-4. If it still fails after two rounds, ask before raising effort to xhigh or switching to Fable; explain why in one line.
-5. Do yourself only: architecture decisions, changes that cross modules, and the final synthesis.
-6. Never turn on ultracode or workflows unless asked; when they are asked for, subagents run on Haiku.
-7. Suggest `/clear` when the next task is unrelated to the current one.
-8. At the start of the first session each week, run the check in `.claude/lean-check.md` (one skill load; it updates only if the synced preset moved).
-9. `/init` in this project is the LeanFlow version (`.claude/skills/init/`); use it to refresh this file.
+**Who does the work**
+1. Small and medium tasks (a few files, one phase): do them here. Subagents start cold and count against the same limits, so delegating small work costs more (Anthropic sub-agents docs; Opus 5 guide: "keep spawn counts low").
+2. Reading a lot of code to find something: use `explorer` (Haiku) and ask for paths plus a short summary. The built-in Explore agent is pinned to Haiku too.
+3. Large, self-contained tasks with heavy reading (a migration, a cross-cutting refactor, a codebase audit): hand them to `orchestrator` with a 5 to 10 line brief; it returns at most 15 lines. (trial E1)
+4. Well-specified implementation can go to `implementer` (Sonnet) with a spec: goal, files, acceptance criteria, verification command.
+5. Use `reviewer` (Opus High) for large or risky diffs only; for small changes, run the tests yourself (Opus 5.5 verifies its own work).
+
+**Long output**
+6. A hook saves long command output to `.claude/logs/` and shows the tail, the error lines and the log path. Grep the log for what you need; ask `log-reader` only for logs too large to grep usefully. (trial E2)
+
+**When something fails: escalate automatically, without asking** (trial E6; ladder in `.claude/lean/escalation.json`)
+7. First classify the failure. Environment failure (network, timeout, missing dependency, a flaky test that passes on rerun, disk, permissions): fix the environment or rerun once; do not escalate.
+8. Capability failure (the agent's change still fails its acceptance check after it tried to fix it, or it says it cannot solve it): move one rung up the ladder in `escalation.json`, carrying the spec and the failure output. Raise effort within the same model first (it keeps the cache); change model only by launching a fresh subagent on the next rung, never by switching this session's model.
+9. At the top rung, retry once. If it still fails, stop and tell the user what was tried at each rung and the last error. Offer a costlier option only if `escalation.json` → `ask_user_options` lists one (pairs the data shows beating the top rung); if the list is empty, say no measured option does better and suggest splitting or re-specifying the task.
+10. Log every attempt as one line in `.claude/lean/events.jsonl`: `{"date","task","rung","model","effort","outcome":"pass|fail","failure":"env|capability|none"}`. This is LeanFlow's quality signal.
+
+**Housekeeping**
+11. Never turn on ultracode or workflows unless asked; when asked, subagents run on Haiku.
+12. Suggest `/clear` when the next task is unrelated.
+13. Once a week, at the start of the first session, run `python3 .claude/lean/lean_maint.py weekly` and act only on its last line (`ACTION NONE` or `ACTION RUN <skill>`).
+14. `/init` in this project is the LeanFlow version (`.claude/skills/init/`).
 
 Verification commands for this repo:
 
@@ -150,7 +162,8 @@ beside their package under `*/src/test/java`, named by behaviour
 - `.claude/rules/plugin-update.md` — `PluginUpdater`, sources, checksums, the behaviours established against live APIs (§ Plugin auto-update).
 - `.claude/rules/auth.md` — the authentication server subtree and the offline-auth gate (§ The authentication server, § Offline authentication).
 - `.claude/rules/commands-and-l10n.md` — Brigadier commands, the permission rule, translations (§ Commands and permissions, § Translations).
-- `.claude/agents/` — `explorer` (Haiku), `implementer` (Sonnet), `reviewer` (Opus High).
-- `.claude/skills/init/` — this project's `/init`; `.claude/lean-check.md` — the weekly preset check.
+- `.claude/agents/` — `orchestrator` (Opus), `explorer` and `Explore` (Haiku), `implementer` (Sonnet), `reviewer` (Opus High), `log-reader` (Haiku).
+- `.claude/lean/` — `escalation.json` (the ladder), `events.jsonl` (every attempt), `lean_maint.py` (weekly maintenance); `.claude/hooks/lean-logs.py` digests long output into `.claude/logs/`.
+- `.claude/skills/init/` — this project's `/init`; `.claude/lean-check.md` — the weekly check.
 - `.github/claude/resolve-upstream.md` — the prompt for Claude in CI (switched off unless `UPSTREAM_CLAUDE` is `true`).
 - `CLAUDE.md.bak` — the previous, 444-line version of this file (not tracked; `git log -p CLAUDE.md` has it too).
