@@ -21,9 +21,10 @@ on:
   push:
     branches: ['**']
     tags: ['v*']
-    # Documentation, CI and git's own settings leave the jar identical, so they are released with the next real change
+    # Documentation, CI, Claude Code's project setup (.claude/) and git's own settings leave the jar identical, so they
+    # are released with the next real change
     # rather than on their own. Path filters do not apply to tag pushes.
-    paths-ignore: ['docs/**', '**/*.md', '.github/**', '.gitignore', '.gitattributes']
+    paths-ignore: ['docs/**', '**/*.md', '.github/**', '.claude/**', '.gitignore', '.gitattributes']
   workflow_dispatch:
 
 permissions:
