@@ -18,6 +18,22 @@
   "subagentPromptCacheTtl": "1h",
   "env": {
     "CLAUDE_CODE_SUBAGENT_MODEL": "haiku",
-    "CLAUDE_CODE_SUBAGENT_EFFORT": "low"
+    "CLAUDE_CODE_SUBAGENT_EFFORT": "low",
+    "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "2",
+    "LEAN_LOG_FORMAT": "object"
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/lean-logs.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
   }
 }

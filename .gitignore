@@ -102,3 +102,8 @@ native/libdeflate
 native/src/main/resources/linux_x86_64/velocity-cipher.so
 # Local Claude Code settings (per-machine tool permissions)
 .claude/settings.local.json
+
+### LeanFlow ###
+.claude/logs/
+.claude/lean/telemetry-pending.jsonl
+.claude/lean-advice.md
