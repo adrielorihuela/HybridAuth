@@ -153,13 +153,16 @@ jobs:
         git config user.name "github-actions[bot]"
         git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
         mkdir -p "${WORK}"
-    # Without the secret, everything below behaves as it did before Claude: a person resolves it.
+    # Claude in CI is off unless the repository variable UPSTREAM_CLAUDE is "true" (and the secret is
+    # set): by the owner's decision, an update that needs judgment stops and waits for a person or a
+    # Claude session. Off, everything below behaves as it did before Claude: a person resolves it.
     - name: Is Claude set up
       id: claude
       env:
         TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        SWITCH: ${{ vars.UPSTREAM_CLAUDE }}
       run: |
-        if [ -n "${TOKEN}" ]; then echo "enabled=true"; else echo "enabled=false"; fi | tee -a "$GITHUB_OUTPUT"
+        if [ -n "${TOKEN}" ] && [ "${SWITCH}" = "true" ]; then echo "enabled=true"; else echo "enabled=false"; fi | tee -a "$GITHUB_OUTPUT"
 
     # With Claude, a conflict is left in progress for it to resolve; without, it is aborted.
     - name: Merge the upstreams
