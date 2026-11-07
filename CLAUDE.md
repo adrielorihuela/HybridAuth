@@ -1,444 +1,156 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+HybridAuth is a fork of [Velocity](https://github.com/PaperMC/Velocity), the Minecraft server proxy:
+hybrid offline profiles, offline authentication on an in-process authentication server, per-server
+shortcut commands, portal redirects and plugin auto-update. Most of the tree is upstream code.
+
+## How to work in this repo
+
+You are the orchestrator. Your job is to understand, plan, delegate and verify; not to do what a subagent does cheaper.
+
+1. Before touching code, delegate exploration to `explorer` (Haiku). Ask for paths and a summary, not full file contents.
+2. Write a spec of 5 to 15 lines: goal, files, acceptance criteria, verification command. Delegate execution to `implementer` (Sonnet).
+3. Hand the diff to `reviewer` (Opus High). If REJECTED, send the list back to the implementer. At most two rounds.
+4. If it still fails after two rounds, ask before raising effort to xhigh or switching to Fable; explain why in one line.
+5. Do yourself only: architecture decisions, changes that cross modules, and the final synthesis.
+6. Never turn on ultracode or workflows unless asked; when they are asked for, subagents run on Haiku.
+7. Suggest `/clear` when the next task is unrelated to the current one.
+8. At the start of the first session each week, run the check in `.claude/lean-check.md` (one skill load; it updates only if the synced preset moved).
+9. `/init` in this project is the LeanFlow version (`.claude/skills/init/`); use it to refresh this file.
+
+Verification commands for this repo:
+
+- `./gradlew :velocity-proxy:spotlessApply` — formatting; run before every commit.
+- `./gradlew :velocity-proxy:test --tests "<fully.qualified.TestClass>"` — the tests for the code touched.
+- `./gradlew build` — the full cycle: compile, Checkstyle, Spotless check, all tests, distributions.
+- `.github/scripts/smoke-test.sh proxy/build/libs/HybridAuth-<forkVersion>.jar` — after `build`, for anything touching start-up, login, configuration or the authentication server: the jar must boot and log `[auth]: Server started on /127.0.0.1:30065`.
+- Changes to `.github/scripts/`: `bash -n` on the script, then run it against real history (the 4.2.0 merge, `84bd8cc`, exercises every check).
 
 ## What this repository is
 
-HybridAuth is a fork of [Velocity](https://github.com/PaperMC/Velocity), the Minecraft
-server proxy. Most of the tree is upstream code.
-
 **Read the docs before changing anything in login, configuration, commands or the `:limbo`
-module.** They are not background reading — most of what is written there exists to stop a specific
-mistake being made twice.
+module.** Most of what is written there exists to stop a specific mistake being made twice.
 
 | Where | What it answers |
 | --- | --- |
 | `docs/guide/` | How an operator uses the fork. Start at `docs/guide/getting-started.md`. |
-| `docs/development/README.md` | Why the fork is built this way: the specification, the attempt that failed, the protocol research, the architecture chosen. |
-| `docs/development/updating-upstreams.md` | **How to pull changes from Velocity or NanoLimbo.** Read this before any upstream work — merging and rebasing are not interchangeable here. It runs hourly by itself, with Claude resolving in CI what needs judgment; this page also says what to do when it stops for review. |
-| `docs/development/releasing.md` | **How releases happen**: every change reaching `main` is released, with the version taken from the commit subjects. Read it before choosing a commit subject or bumping `forkVersion`. |
+| `docs/development/README.md` | Why the fork is built this way: specification, the failed attempt, protocol research, architecture. |
+| `docs/development/updating-upstreams.md` | **How to pull changes from Velocity or NanoLimbo** — merging and rebasing are not interchangeable here. Runs hourly by itself; also says what to do when it stops for review. |
+| `docs/development/releasing.md` | **How releases happen**: every change reaching `main` is released, versioned from commit subjects. |
 | `docs/development/auth-server.md` | The vendored subtree, its three local patches, and why each exists. |
 
-Fork-specific behaviour:
+Fork-specific behaviour (each guide in `docs/guide/` explains it):
 
-- **Hybrid offline profiles** (`connection/client/InitialLoginSessionHandler.java`) — when the
-  Mojang session server returns 204, the player is accepted with a `.`-suffixed username and
-  an offline UUID derived from it, instead of being disconnected. See
-  `docs/guide/hybrid-offline-profiles.md`.
-- **Offline authentication** (`proxy/.../auth/`, `offline-auth` in the config) — unauthenticated
-  offline players are held on an authentication server until they `/register` or `/login`. On by
-  default. See `docs/guide/offline-auth.md`.
-- **The authentication server** (`:limbo` module, `auth/AuthServer.java`) — a vendored copy of
-  NanoLimbo run in-process. "Limbo" is only the upstream project's name; everything
-  operator-facing calls it the authentication server. See `docs/development/auth-server.md`.
-- **Per-server shortcut commands** (`command/builtin/ServerShortcutCommand.java`, registered
-  from `VelocityServer#registerServerCommands`) — the `comandos` list in `[servers]`.
-  See `docs/guide/server-commands.md`.
-- **Portal redirects** (`BackendPlaySessionHandler#handle(RespawnPacket)`, the `[portales]`
-  section) — a backend moving a player into the Nether or the End sends them to the configured
-  server instead. The respawn packet is still forwarded, so a failed connection leaves the player
-  consistent on the origin. **The backend's respawn is registered encode-only in `StateRegistry`**,
-  so it is never decoded: it reaches `handleUnknown` as a raw buffer and is read there.
-  `handle(RespawnPacket)` alone never fires, which is how 1.3.0-beta.1 shipped not working. The
-  section is written with multi-line inline tables, so the configuration is parsed as TOML 1.1
-  (`config/Toml11Format.java`). See `docs/guide/portal-redirects.md`.
-- **Plugin auto-update** (`plugin/update/`, the `[plugins]` section) — listed plugins are
-  downloaded and updated in parallel from Hangar, Modrinth, GitHub, GeyserMC and LuckPerms,
-  immediately before `loadPlugins()`. See `docs/guide/getting-started.md`.
+- **Hybrid offline profiles** (`connection/client/InitialLoginSessionHandler.java`): on a 204 from
+  Mojang's session server the player is accepted with a `.`-suffixed name and an offline UUID from it.
+- **Offline authentication** (`proxy/.../auth/`, `[offline-auth]`, on by default): unauthenticated
+  offline players wait on the authentication server until they `/register` or `/login`.
+- **The authentication server** (`:limbo`, `auth/AuthServer.java`): vendored NanoLimbo run
+  in-process. "Limbo" is only upstream's name; everything operator-facing says authentication server.
+- **Per-server shortcut commands** (`command/builtin/ServerShortcutCommand.java`, registered from
+  `VelocityServer#registerServerCommands`): the `comandos` list in `[servers]`.
+- **Portal redirects** (`[portales]`): **the backend's respawn is registered encode-only in
+  `StateRegistry`**, so it reaches `BackendPlaySessionHandler#handleUnknown` as a raw buffer and is
+  read there; `handle(RespawnPacket)` alone never fires (how 1.3.0-beta.1 shipped broken). The
+  respawn is still forwarded. The section uses multi-line inline tables, so the configuration is
+  parsed as TOML 1.1 (`config/Toml11Format.java`).
+- **Plugin auto-update** (`plugin/update/`, `[plugins]`): Hangar, Modrinth, GitHub, GeyserMC and
+  LuckPerms, in parallel, immediately before `loadPlugins()`.
 
-The configuration is `config/HybridAuth.toml`. `ConfigurationLocation` owns that directory and
-moves any earlier name into place on first start — `proxy.toml` and upstream's `velocity.toml`, in
-`config/` or in the proxy root — along with `forwarding.secret`. (`hybridvelocity.toml` stopped being
-read in 1.3.1, by the owner's decision; the 1.3.1 notes tell operators to rename it by hand.) The
-secret is **moved and never regenerated**: a fresh one is accepted by the proxy and rejected by
-every backend on modern forwarding, with no error anywhere to explain it. The `.toml` extension is
-load-bearing, since night-config picks its parser from it.
+The configuration is `config/HybridAuth.toml`; `ConfigurationLocation` moves `proxy.toml` and
+upstream's `velocity.toml` (in `config/` or the root) into place with `forwarding.secret`.
+`hybridvelocity.toml` stopped being read in 1.3.1. The secret is **moved and never regenerated**: a
+fresh one is rejected by every backend on modern forwarding with no error to explain it. The
+`.toml` extension is load-bearing (night-config picks its parser from it).
 
-Permission nodes are `hybridauth.command.*`, and upstream's `velocity.command.*` is still read as a
-fallback when the `hybridauth` node is unset. See **Renames, and the literals that must survive
-them** below — that fallback has been broken twice by search-and-replace.
+Permission nodes are `hybridauth.command.*`, with upstream's `velocity.command.*` read as a fallback
+when the `hybridauth` node is unset.
 
-Keep diffs against upstream narrow so upstream merges stay manageable.
+**Hard constraints**
 
-`main` is a linear continuation of upstream Velocity's `dev/4.0.0`, so upstream changes are
-**merged**, never rebased in: the NanoLimbo subtree was imported with a merge commit that
-`git subtree pull` looks for, and rebasing would drop it and rewrite published history.
-`docs/development/updating-upstreams.md` has the procedure and the conflict-prone files.
+- Keep diffs against upstream narrow so upstream merges stay manageable.
+- `main` continues upstream's `dev/4.0.0`: upstream changes are **merged, never rebased** (the
+  NanoLimbo subtree's import merge commit must survive, and published history must not be rewritten).
+- **A push to `main` is a release**, and the commit subject is the version decision: `feat:` a minor,
+  `type!:`/`BREAKING CHANGE` a major, anything else a patch — never `feat:` for a fix. Only changes
+  limited to `docs/`, `.md`, `.github/`, `.claude/` or `.gitignore`/`.gitattributes` are not released.
+- Renames by search and replace have broken compatibility twice. `LEGACY_PERMISSION_PREFIXES`
+  (`BuiltinCommandUtil`) and `PREVIOUS_NAMES` (`ConfigurationLocation`) hold old names on purpose
+  and must never be touched; nor the `velocity.command.*` translation keys, the `com.velocitypowered`
+  packages, the `velocity-api`/`velocity-proxy` module names, the `velocity:player_info` channel or
+  the `"velocity"` plugin id. Never bring back the `hybridvelocity` name or the `/ha`, `/hv` aliases.
+- `config-version` belongs to upstream; fork migrations count on `hybridauth-config-version`.
+- `limbo/upstream/` is a pristine subtree: no reformatting, local changes only as marked
+  `HybridAuth patch:` blocks (a licensing requirement, not style).
+- Blocking work never runs on a Netty event loop.
 
 ## Committing is not optional
 
-**Commit every change, and push every commit.** Not at the end of a session, not once the feature
-works — as each piece is finished. Two reasons, and the second one is the important one:
-
-1. The commits are the record of how the work was done. A single commit at the end throws away the
-   reasoning, and this repository leans hard on commit messages explaining *why*.
-2. **Everything not pushed exists on exactly one computer.** A push is the backup. If the machine
-   dies mid-project, whatever was pushed survives and the rest does not. Pushing also lets progress
-   be watched in real time rather than reported afterwards.
-
-So: `git commit`, then `git push`, every time. Do not batch them, and do not leave commits sitting
-unpushed while moving on to the next thing.
-
-**This includes updating this file.** A `/init` that is only on one disk has not been recorded at
-all, and this file is the first thing the next session reads. Rewriting it and stopping there is
-the one omission that costs the most, so `/init` always ends in a commit and a push.
+**Commit every change, and push every commit** — as each piece is finished, not at the end. The
+commits are the record of *why*, and **everything not pushed exists on exactly one computer**: a push
+is the backup, and lets progress be watched live. `git commit`, then `git push`, every time; never
+batch them or leave commits unpushed. **This includes updating this file**: `/init` always ends in a
+commit and a push.
 
 ## Commands
 
-The Gradle wrapper is the entry point; on Windows use `./gradlew.bat`. The build targets a
-Java 25 toolchain, and CI runs on JDK 25 too.
+The Gradle wrapper is the entry point (`./gradlew.bat` on Windows); Java 25 toolchain, JDK 25 in CI.
 
 ```bash
-./gradlew build
+./gradlew build                                   # compile, Checkstyle, Spotless check, tests, distributions
+./gradlew :velocity-proxy:test --tests "com.velocitypowered.proxy.config.ServersConfigTest"  # one class
+./gradlew :velocity-proxy:spotlessApply           # formatting; the build fails on style violations
+./gradlew :velocity-proxy:runShadow               # run locally; generates config, secret and lang/ in proxy/run/
+./gradlew updateUpstreams                         # update both upstreams by hand; never pushes
 ```
 
-Full cycle for all modules: compile, Checkstyle, Spotless check, tests, distributions.
-
-```bash
-./gradlew :velocity-proxy:test --tests "com.velocitypowered.proxy.config.ServersConfigTest"
-```
-
-Run one test class (drop `--tests` for the whole proxy module). Modules are named
-`:velocity-api`, `:velocity-proxy`, `:velocity-native`.
-
-```bash
-./gradlew :velocity-proxy:spotlessApply
-```
-
-Apply formatting — run before committing, the build fails on style violations.
-
-```bash
-./gradlew updateUpstreams
-```
-
-Update both upstreams by hand (the hourly workflow runs this same task; see **Releases and upstream
-updates run themselves**): adds the `upstream` and `limbo-upstream` remotes if a clone is missing them,
-merges Velocity, pulls the NanoLimbo subtree with the flags it requires, and prints what to check
-afterwards. Both fetches pass `--no-tags`, which is load-bearing: NanoLimbo numbers its releases
-the way this fork does, and a plain fetch imported twenty-two of its tags including a `v1.2.1` that
-collided with a release tag here. It refuses to run on a dirty tree, mid-merge, or off `main`, leaves a conflicted merge
-in progress rather than aborting it, and never pushes. `addUpstreams`, `updateVelocity` and
-`updateAuthServer` are the individual steps. Defined in `gradle/upstreams.gradle.kts`; the
-reasoning is in `docs/development/updating-upstreams.md`.
-
-```bash
-./gradlew :velocity-proxy:runShadow
-```
-
-Run the proxy locally; it generates `config/HybridAuth.toml`, `config/forwarding.secret` and
-`lang/` in `proxy/run/`. The build produces two jars in `proxy/build/libs/`:
-`HybridAuth-<forkVersion>.jar` is the runnable distributable and the one to attach to a
-release; `HybridAuth-<forkVersion>-thin.jar` is not runnable and only feeds `shadowJar`.
-
-### Versioning
-
-Two versions coexist, and they are not interchangeable:
-
-- `version` in `gradle.properties` (`4.2.1-SNAPSHOT`) is the **upstream Velocity API version**.
-  It sets the Maven coordinates of `velocity-api`, so plugins compile against it — do not bump
-  it to express a fork release.
-- `forkName` / `forkVersion` in `gradle.properties` name the **fork's distributable**. The
-  proxy's `shadowJar` uses them for the archive name and manifest, and `VelocityServer#getVersion`
-  reads that manifest, which is why the proxy logs `Booting up HybridAuth <forkVersion>`.
-  The release workflow sets `forkVersion` itself; bump it by hand only to release with
-  hand-written notes. See **Releases and upstream updates run themselves** below.
-
-### Java 25 is a hard requirement
-
-Nothing sets `options.release`, so the toolchain's 25 is also the bytecode target and the jar will
-not load on anything older. The one exception is `proxy/src/bootstrap/`, a single-class source set
-compiled with `options.release = 8` that is the jar's `Main-Class`: it loads anywhere, checks
-`java.specification.version` and explains the problem instead of letting the classloader throw
-`UnsupportedClassVersionError`. It reaches the real entry point by reflection so the Java 25 classes
-are not linked before the check passes, and it must stay free of anything newer than Java 8.
-
-## Releases and upstream updates run themselves
-
-Two workflows do what used to be done by hand. Know what they do before pushing to `main`, because
-**a push to `main` is a release**.
-
-**`.github/workflows/release.yml` releases every change that reaches `main`** — a merged pull
-request, a direct push — except one touching only `docs/`, `.md` files, `.github/` or
-`.gitignore`/`.gitattributes`, whose jar would
-be identical. The version comes from the commit subjects since the last stable tag: `feat:` is a
-minor, `type!:` or `BREAKING CHANGE` a major, anything else a patch. So the subject you write *is*
-the version decision: use `feat:` for a feature, and never `feat:` for a fix. It builds first, then
-commits `forkVersion` and the notes (from `docs/releases/TEMPLATE.md`) back to `main` as
-`chore: release <version>`, tags, and publishes the jar.
-
-To release with **hand-written notes** — anything an operator should read about — put
-`docs/releases/<version>.md` and `forkVersion=<version>` in the same pull request; that version and
-those notes are used as they are. A hyphenated `forkVersion` (`1.4.0-beta.1`) on any branch is a
-pre-release for testing before a merge, deleted when its stable version comes out. Full detail:
-`docs/development/releasing.md`.
-
-**`.github/workflows/upstream.yml` checks both upstreams every hour** (`git ls-remote`, seconds, no
-build) and only when one has commits `main` lacks does it merge them. It resolves the one mechanical
-conflict (`gradle.properties` / `libs.versions.toml`, key by key), runs the review checks in
-`.github/scripts/review-checks.sh`, builds, starts the jar, and — only if all of that passes — pushes
-to `main` and releases a patch with notes from `docs/releases/TEMPLATE-upstream.md` saying it was
-automatic. It never redoes the same upstream commits: the issue and a commit on the
-`upstream-update/<date>` branch carry `<!-- upstream velocity=<sha> limbo=<sha> -->`, and an open
-issue or such a branch with the current marker means nothing happens — so it works with the
-repository's Issues switched off too.
-
-When something needs judgment and the `CLAUDE_CODE_OAUTH_TOKEN` secret is set, **Claude resolves it
-in the same run, on the runner**, with the prompt in **`.github/claude/resolve-upstream.md`** (edit
-that file to change what Claude in CI is told). Claude edits and commits only — no Gradle, no push,
-no token. `claude-rounds.sh` loops up to three rounds: after each, `verify-resolution.sh` builds,
-starts the jar and checks the result, and `extract-failure.py` hands only the relevant error to the
-next round. A passing round is pushed to `main` and released, and the issue gets Claude's summary
-and is closed. Otherwise, or without the secret, nothing reaches `main`: the merge waits on
-`upstream-update/<date>` and an issue labelled `upstream-update` says what needs judgment and what
-Claude tried.
-
-**When asked to resolve an upstream update**, follow "When it stops for review" in
-`docs/development/updating-upstreams.md`: deal with every reason in the issue, replace every
-`MANUAL` comment in `docs/releases/<version>.md` with what was found and what was done, build and
-start the jar, and merge into `main` through a pull request from the session branch. The release
-then goes out with those notes.
-
-The subscription token lasts one year: `claude-check.yml` tests it monthly and opens a `claude-token`
-issue when it needs renewing (`claude setup-token`, then update the secret). GitHub disables
-schedules after 60 days without commits, so the upstream `check` job re-enables them daily, and
-`branch-cleanup.yml` deletes branches whose commits are all in `main`.
-
-Pushes made with `GITHUB_TOKEN` start no workflow — that is why the release commit cannot loop, and
-why `upstream.yml` starts `release.yml` with `workflow_dispatch`. The scripts in `.github/scripts/`
-run locally too; test a change to one against real history before pushing it (the 4.2.0 merge,
-`84bd8cc`, is the case that exercises every check).
-
-## Architecture
-
-### Connection lifecycle
-
-A player connection is a Netty channel wrapped in `MinecraftConnection`, which delegates every
-packet to a single **active session handler** (`MinecraftSessionHandler`). Progressing through
-the protocol means swapping that handler via
-`MinecraftConnection#setActiveSessionHandler(StateRegistry, handler)` — this both installs the
-handler and switches the packet registry, and must run on the connection's event loop.
-
-The client-side chain is `HandshakeSessionHandler` → `StatusSessionHandler` (ping) or
-`InitialLoginSessionHandler` (encryption + Mojang auth) → `AuthSessionHandler` (builds the
-`ConnectedPlayer`) → `ClientConfigSessionHandler` / `ClientPlaySessionHandler`. The proxy holds
-a second connection per player to the backend server (`VelocityServerConnection`) with its own
-chain in `connection/backend/`: `LoginSessionHandler` → `TransitionSessionHandler` →
-`BackendPlaySessionHandler`.
-
-`StateRegistry` (`protocol/StateRegistry.java`) is the single source of truth mapping packet
-IDs to classes per protocol state and per Minecraft version. Adding or changing a packet means
-editing the relevant state's `serverbound`/`clientbound` registrations there, keyed by
-`ProtocolVersion` ranges. The Netty pipeline in `protocol/netty/` handles framing, compression
-and encryption around it.
-
-Because everything runs on Netty event loops, blocking work must be dispatched off-loop
-(see `VelocityScheduler`), and code touching a connection must respect its event loop.
-
-### config-version belongs to upstream
-
-`config-version` counts **upstream Velocity's** migrations, and every upstream migration is gated
-on being *below* a number. This fork used to write `3.2` into it while upstream sat at `2.8`,
-which spends four numbers that are not ours: a Velocity release adding a migration at `2.9` would
-have found `3.2` already there and skipped it, silently, on every installation at once. Nothing
-fails; a setting simply never gets migrated.
-
-Fork migrations therefore count on **`hybridauth-config-version`**, and `OfflineAuthMigration`
-hands `config-version` back to upstream's value on any configuration still carrying the old
-number. When merging an upstream release, check whether it moved `config-version` in
-`default-velocity.toml` and follow it — that value is theirs to set.
-
-### Renames, and the literals that must survive them
-
-The project has been renamed twice (`velocity` → `hybridvelocity` → `hybridauth`) and the
-configuration file three times. Both renames were done with a tree-wide search and replace, and
-**both times that quietly broke the compatibility they were supposed to preserve** by rewriting the
-old name inside the fallback list as well. Tests caught it; a person would not have.
-
-So: `LEGACY_PERMISSION_PREFIXES` in `BuiltinCommandUtil` (`"velocity.command."`) and
-`PREVIOUS_NAMES` in `ConfigurationLocation` (`"proxy.toml"`, `"velocity.toml"`) hold **string
-literals of names this project no longer uses**. They are correct precisely because they are out of
-date, and a search and replace must never touch them. There are tests pinning both lists, and they
-are the only thing standing between a rename and somebody's granted permissions silently
-disappearing.
-
-1.3.1 deliberately shortened both lists, which is not the same thing as a rename breaking them: the
-fork's own intermediate name is gone everywhere — the `hybridvelocity` command alias,
-`hybridvelocity.command.*` and `hybridvelocity.toml` — along with the `/ha` and `/hv` shortcuts.
-Only `hybridauth` and upstream's `velocity` remain. Do not add the intermediate name back as an
-alias, a prefix or a file name, and do not drop `velocity` from either list: that is what keeps a
-stock Velocity installation working when this jar is dropped into it.
-
-### Plugin auto-update
-
-`plugin/update/PluginUpdater` runs from `VelocityServer#start()` **immediately before
-`loadPlugins()`** and blocks until every listed plugin is on disk — after that point the loader has
-already read the directory. `reloadConfiguration()` deliberately does not repeat it: plugins are
-not reloadable, so a newer jar there would only make the files disagree with what is running.
-
-Each source is a `PluginSource` returning a `PluginRelease`, and they agree on almost nothing:
-Hangar, GitHub and GeyserMC publish SHA-256, Modrinth publishes SHA-512 and SHA-1 but not SHA-256,
-and LuckPerms publishes no checksum at all. So the checksum travels with its algorithm and may be
-absent, and freshness falls back to the file name only where it has to.
-
-Several things here were established against the live APIs, not assumed, and are easy to undo by
-accident:
-
-- **Stability is a ladder, not a filter.** Hangar and Modrinth are asked for Release, then Beta,
-  then Alpha, and the newest build of the first tier that has any is installed. Asking is required
-  — unfiltered, Hangar answers ViaVersion with `5.12.0-SNAPSHOT+1053` — and so is falling through:
-  Simple Voice Chat publishes thirteen Velocity builds and not one of them is a release. Stability
-  wins over recency, so it gets `2.5.28 (Beta)` rather than the newer `2.6.18` alpha. Anything
-  below Release carries its channel in the version string so it cannot read as stable in the log.
-- **GitHub downloads go through the API asset URL**, with the token and
-  `Accept: application/octet-stream`. `browser_download_url` answers 404 for a repository whose
-  owner GitHub has flagged — with or without a valid token — while the API serves it normally.
-- ***Up to date* is decided by the checksum, not the file name.** Hangar's version string and the
-  version inside the file name differ (`5.12.0-SNAPSHOT+1053` ships
-  `ViaVersion-5.12.0-SNAPSHOT.jar`). The same digest verifies the download.
-- **The updater builds its own `HttpClient`.** The proxy's follows no redirects and is shared with
-  Mojang session authentication; GeyserMC answers `builds/latest` with a 302 and GitHub's download
-  links point at another host.
-- **Geyser and Floodgate cannot come from Hangar.** Their entry there is an external link with
-  `fileInfo: null` and a version named "Geyser". `HangarSource` detects that shape and says so.
-
-Pruning older jars of a plugin runs on **both** paths, updated and already-current: two jars
-claiming one plugin id make the loader refuse whichever it reads second, and that was a real bug
-before it ran on the up-to-date path too.
-
-### Wiring
-
-`VelocityServer` is the composition root: it constructs the command manager, event manager,
-plugin manager, scheduler, `ServerMap` and `ConnectionManager`, then `start()` registers
-built-in commands, loads the configuration, registers servers, loads plugins, fires
-`ProxyInitializeEvent` and binds. Note the ordering constraint: built-in commands are
-registered *before* the config is loaded, so anything that depends on configuration (like the
-server shortcut commands) must be registered after the server-registration loop.
-`reloadConfiguration()` is the mirror image for `/hybridauth reload` and must be updated
-whenever startup gains configuration-derived state.
-
-`VelocityConfiguration` deserializes `config/HybridAuth.toml` with night-config, using
-`proxy/src/main/resources/default-velocity.toml` as the template written on first run.
-Sub-tables (`[servers]`, `[forced-hosts]`, `[advanced]`, …) map to private static inner
-classes. `validate()` is the place for cross-checks between sections, and
-`config/migration/` holds `ConfigurationMigration` implementations that rewrite older configs
-in place — add one when an existing key changes shape.
-
-`api/` is the public plugin API and must stay source-compatible; `proxy/` implements it.
-`native/` provides libdeflate/OpenSSL acceleration with pure-Java fallbacks, so nothing may
-assume the native path is available. `limbo/` is vendored third-party source — see below.
-
-### The authentication server and its subtree
-
-`limbo/upstream/` is a pristine `git subtree` of [NanoLimbo](https://github.com/Nan1t/NanoLimbo)
-(GPL-3.0, same licence as this fork). The module's build script sits *outside* the subtree and
-points `sourceSets` into it, so upstream stays byte-identical and `git subtree pull` does not
-conflict. Three upstream files carry local patches, each marked `HybridAuth patch:` and listed
-in `docs/development/auth-server.md` — keep that list accurate and the patch surface small.
-
-**Checkstyle is disabled and Spotless excludes `upstream/**` for that module.** This is a
-licensing requirement, not a style preference: `velocity-spotless` applies
-`licenseHeaderFile(HEADER.txt)`, which replaces everything above the `package` declaration and
-would rewrite NanoLimbo's GPL copyright notices to "Velocity Contributors".
-
-`AuthServer` writes `auth/settings.yml` once from the documented template at
-`proxy/src/main/resources/auth-server-settings.yml` and then never touches it again, so its comments
-survive Configurate, which strips them on save. The bind address and forwarding are deliberately
-absent from that file — the operator must not be able to move it off loopback or disagree with the
-proxy's forwarding mode — and are passed to `LimboServer` in code. That is what the `override` patch
-in the vendored `LimboConfig` is for: its `load()` reads both from disk and throws outright when
-`infoForwarding` is missing, so the values have to be installed before loading, not assigned after.
-
-The password database is at a fixed `auth/player-passwords.db`. It needs its own TCP port: two
-listeners cannot share one (`SO_REUSEPORT` load-balances rather than multiplexes), and a socketless
-in-JVM transport would not be pingable by ViaVersion, which the section below depends on.
-
-### Offline authentication
-
-The gate (`auth/OfflineAuthGate.java`) is built entirely from events, not by patching the login
-handlers. One `ServerPreConnectEvent` listener covers every route to a backend, because they all
-end up in `createConnectionRequest`; `PlayerAvailableCommandsEvent` hides commands;
-`CommandExecuteEvent` blocks execution; a `PermissionsSetupEvent` function denies permissions.
-`PostLoginEvent` must keep firing — an earlier attempt short-circuited it and broke plugins.
-
-Blocking work stays off the event loops: `AuthDatabase` serialises JDBC on one thread and
-`OfflineAuthManager` runs bcrypt on its own pool. `PasswordLookup` deliberately distinguishes
-`FAILED` from `NOT_REGISTERED`, so a broken database cannot offer `/register` for an account
-that already exists.
-
-**The authentication server is registered normally.** It was once kept out of the `ServerMap` to
-hide it, which broke ViaVersion: Via pings every server in `getAllServers()` to learn its protocol,
-and a server it cannot see falls back to a pre-1.16 assumption and mis-decodes the login. It is
-hidden from command output through `server/InternalServers.java` instead — add any new
-player-facing server listing to that filter rather than un-registering things. Its name comes from
-`[offline-auth] server-name`, so `InternalServers` is told it at start-up, not a constant.
-
-**Bedrock players are never gated** (`auth/BedrockPlayers.java`). Geyser reaches the proxy through
-Floodgate's `PreLoginEvent.forceOfflineMode()`, so those players are offline-mode and used to fall
-straight into the gate. Detection has two paths on purpose: Floodgate's API is the authoritative one
-and the only one that recognises a player who *linked* a Java account, while the UUID shape (top 64
-bits zero, which a Java offline UUID can never have) is the fallback. A yes from either is enough,
-and no reflective failure may throw — being wrong here must not stop somebody logging in. The API is
-reached with `Class.forName(name, false, pluginInstance.getClass().getClassLoader())`: the proxy's
-own loader is `PluginClassLoader`'s *parent*, and delegation never runs parent to child, so a plain
-`Class.forName` cannot see plugin classes. The gate exposes `isSubjectToAuth` alongside `isGated` —
-`/changepassword` repeats the check itself instead of asking `isGated`, so it needs the former.
-
-**`/register` and `/login` are load-bearing.** They are the only way past the gate, so they carry no
-permission node (nothing for a permissions plugin to revoke), are re-allowed at `PostOrder.LAST` if
-another plugin's `CommandExecuteEvent` listener denies them, and are re-registered after
-`ProxyInitializeEvent` if a plugin overwrote the alias. Which of the two a player sees is decided in
-the `PlayerAvailableCommandsEvent` handler, which returns an `EventTask` so the packet waits for the
-database lookup — the `requires` predicates run earlier, while the answer is still unknown.
-
-### Commands and permissions
-
-Commands are Brigadier nodes registered through `VelocityCommandManager`, which lowercases
-aliases (so commands are case-insensitive regardless of the literal's casing). The proxy's own
-command is `/hybridauth`, with `velocity` as its only alias.
-
-Permissions are tri-state and are checked **only** through the two helpers in
-`command/builtin/BuiltinCommandUtil.java`, never by calling `getPermissionValue` directly. Nodes are
-`hybridauth.command.*`, and each helper also consults upstream's `velocity.command.*` node so that
-a permission set up for stock Velocity keeps working. Both helpers share one rule, in `resolve`:
-**the `hybridauth` node decides whenever it is set, true or false; otherwise the `velocity` node
-decides; otherwise the command's default applies.** Only the default differs:
-
-- `isAllowed` — privileged commands, denied by default.
-- `isNotDenied` — `/server` and the per-server shortcuts, allowed by default.
-
-`isNotDenied` used to deny when *either* node said no. With LuckPerms that made the current node
-useless on its own: anything resolving `velocity.command.server` to false — a default group, a
-wildcard, a leftover from stock Velocity — silently overrode a grant on
-`hybridauth.command.server`, and operators could only make it work by setting the `velocity` node.
-That was the 1.3.1 permission fix; `ServerPermissionTest` covers every combination for `/server`
-and a shortcut, and must keep doing so.
-
-**`velocity.command.*` also happens to be the prefix of the translation keys** in
-`messages*.properties`. They are not permissions. A blanket rename across that prefix would rewrite
-34 locale files and break anyone overriding a translation.
-
-Equally off-limits: the `com.velocitypowered` packages, the `velocity-api`/`velocity-proxy` module
-names, the `velocity:player_info` forwarding channel that Paper hardcodes, and the `"velocity"`
-virtual-plugin id that plugins declare as a dependency.
-
-### Translations
-
-User-facing strings are MiniMessage translation keys in
-`proxy/src/main/resources/com/velocitypowered/proxy/l10n/messages*.properties`, resolved
-through `Component.translatable`. Add new keys to `messages.properties`; the files are copied
-to a `lang/` directory next to the proxy on first run, and that copy wins at runtime — delete
-it when testing changed strings.
+Modules: `:velocity-api`, `:velocity-proxy`, `:velocity-native`, `:limbo`. `updateUpstreams`
+(steps: `addUpstreams`, `updateVelocity`, `updateAuthServer`; in `gradle/upstreams.gradle.kts`)
+fetches with `--no-tags` — load-bearing, a plain fetch imported NanoLimbo's colliding `v1.2.1` — and
+refuses a dirty tree, a merge in progress or a branch other than `main`. `proxy/build/libs/` holds
+`HybridAuth-<forkVersion>.jar` (the runnable one, attached to releases) and `-thin.jar` (feeds
+`shadowJar` only).
+
+**Versioning: two versions, not interchangeable.** `version` in `gradle.properties` is the **upstream Velocity
+API version** (the Maven coordinates plugins compile against): never bump it for a fork release.
+`forkName`/`forkVersion` name the distributable (jar name, manifest, `Booting up HybridAuth
+<forkVersion>`); the release workflow sets `forkVersion`, by hand only to release with hand-written
+notes.
+
+**Java 25 is a hard requirement**: it is also the bytecode target. The exception is
+`proxy/src/bootstrap/`, the jar's `Main-Class`, compiled with `options.release = 8`: it checks the
+Java version and explains the problem, reaches the real entry point by reflection, and must stay
+free of anything newer than Java 8.
+
+## Architecture in brief
+
+A player connection is a Netty channel in `MinecraftConnection`, delegating every packet to one
+active `MinecraftSessionHandler`; `StateRegistry` maps packet IDs per state and version. Each player
+also has a backend connection with its own handler chain in `connection/backend/`. `VelocityServer`
+is the composition root and `start()`'s order matters (built-in commands before the config;
+configuration-derived state mirrored in `reloadConfiguration()`). `api/` must stay
+source-compatible; `native/` always has pure-Java fallbacks. The detail for each area loads from
+`.claude/rules/` when its files are in play.
 
 ## Conventions
 
-Google Java Style enforced by Checkstyle and Spotless: two-space indentation, braces on the
-same line, sorted imports, no unused imports. Preserve nullness annotations (Checker
-Framework) and the asynchronous event-loop behaviour of anything you touch.
+Google Java Style via Checkstyle and Spotless: two-space indentation, braces on the same line, sorted
+imports, no unused imports. Preserve nullness annotations (Checker Framework) and the asynchronous
+event-loop behaviour of anything you touch. Tests are JUnit Jupiter (Mockito in the proxy module),
+beside their package under `*/src/test/java`, named by behaviour
+(`hybridOfflineProfileUsesDottedNameForUuid`). Commits: concise imperative subjects, optionally
+`feat:`/`docs:` or an issue reference; one cohesive commit per change, each pushed.
 
-Tests use JUnit Jupiter, with Mockito available in the proxy module. Place them beside their
-package under `*/src/test/java` and name methods by behaviour
-(`hybridOfflineProfileUsesDottedNameForUuid`, `serverCommandsListIsNotTreatedAsServerEntry`).
+## Where things live
 
-Commits use concise imperative subjects, optionally with a `feat:`/`docs:` scope or an issue
-reference. Keep each commit cohesive — and see **Committing is not optional** above: one commit per
-change, and a push behind every commit.
+- `.claude/skills/releases-and-upstream/SKILL.md` — how `release.yml` and `upstream.yml` work, what to do when an update stops for review, the token, the scripts (moved from § Releases and upstream updates run themselves).
+- `.claude/rules/connections.md` — connection lifecycle, handler chains, `StateRegistry` (§ Connection lifecycle).
+- `.claude/rules/configuration-and-wiring.md` — `config-version` and fork migrations; `VelocityServer` wiring, `VelocityConfiguration` (§ config-version, § Wiring).
+- `.claude/rules/renames.md` — the legacy literals and why they must survive renames (§ Renames).
+- `.claude/rules/plugin-update.md` — `PluginUpdater`, sources, checksums, the behaviours established against live APIs (§ Plugin auto-update).
+- `.claude/rules/auth.md` — the authentication server subtree and the offline-auth gate (§ The authentication server, § Offline authentication).
+- `.claude/rules/commands-and-l10n.md` — Brigadier commands, the permission rule, translations (§ Commands and permissions, § Translations).
+- `.claude/agents/` — `explorer` (Haiku), `implementer` (Sonnet), `reviewer` (Opus High).
+- `.claude/skills/init/` — this project's `/init`; `.claude/lean-check.md` — the weekly preset check.
+- `.github/claude/resolve-upstream.md` — the prompt for Claude in CI (switched off unless `UPSTREAM_CLAUDE` is `true`).
+- `CLAUDE.md.bak` — the previous, 444-line version of this file (not tracked; `git log -p CLAUDE.md` has it too).

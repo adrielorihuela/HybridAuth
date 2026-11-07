@@ -1,0 +1,10 @@
+{
+  "presets": {
+    "lean-code": {
+      "version": "2026.11.06",
+      "applied_on": "2026-11-07",
+      "check_every_days": 7,
+      "last_check": "2026-11-07"
+    }
+  }
+}
