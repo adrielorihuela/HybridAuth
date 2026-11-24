@@ -131,7 +131,8 @@ public final class LimboServer {
                 .childHandler(new ClientChannelInitializer(this))
                 .childOption(ChannelOption.TCP_NODELAY, true)
                 .localAddress(config.getAddress())
-                .bind();
+                .bind()
+                .syncUninterruptibly();
     }
 
     private void broadcastKeepAlive() {
